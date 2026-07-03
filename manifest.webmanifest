@@ -1,0 +1,18 @@
+{
+  "name": "合力牧业农牧乳一体化经营管理平台",
+  "short_name": "合力牧业农牧乳",
+  "description": "覆盖奶牛场、肉牛场、饲料厂、乳品厂的农牧乳一体化前端演示平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6fbf8",
+  "theme_color": "#0f766e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

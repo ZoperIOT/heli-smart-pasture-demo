@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow-x: hidden;
+  background: #f6fbf8;
+  color: #10231e;
+  font-size: 17px;
+}
+
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img {
+  max-width: 100%;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding-top: max(12px, var(--safe-top));
+  padding-bottom: calc(96px + var(--safe-bottom));
+}
+
+.bottom-nav {
+  padding-bottom: max(10px, var(--safe-bottom));
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.touch-card {
+  min-height: 44px;
+}
+
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.input-lg {
+  min-height: 52px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  padding: 0 14px;
+  font-size: 18px;
+  font-weight: 600;
+  outline: none;
+}
+
+.btn-primary {
+  display: flex;
+  min-height: 54px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.btn-danger {
+  display: flex;
+  min-height: 54px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 20px;
+  font-weight: 800;
+}
