@@ -3,6 +3,7 @@ import { Download, RotateCcw, Save, Upload } from "lucide-react";
 import SectionTitle from "../components/SectionTitle.jsx";
 import { useDemo } from "../context/DemoContext.jsx";
 import { roleOptions } from "../data/platformModules.js";
+import { workModes } from "../services/roleViewService.js";
 
 export default function Settings() {
   const demo = useDemo();
@@ -65,6 +66,11 @@ export default function Settings() {
           <Label text="当前角色视图">
             <select value={form.currentRole || demo.currentRole} onChange={(e) => setForm({ ...form, currentRole: e.target.value })} className="input-lg">
               {roleOptions.map((role) => <option key={role}>{role}</option>)}
+            </select>
+          </Label>
+          <Label text="当前工作模式">
+            <select value={form.currentWorkMode || demo.currentWorkMode} onChange={(e) => setForm({ ...form, currentWorkMode: e.target.value })} className="input-lg">
+              {workModes.map((mode) => <option key={mode}>{mode}</option>)}
             </select>
           </Label>
           <button onClick={saveSettings} className="btn-primary"><Save size={22} /> 保存设置</button>

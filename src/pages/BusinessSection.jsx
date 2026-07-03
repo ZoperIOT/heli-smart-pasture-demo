@@ -57,7 +57,7 @@ export default function BusinessSection({ dataKey }) {
       <section className="rounded-[8px] bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-pasture-700">{config.unit}</p>
+            <p className="text-sm font-black text-pasture-700">{config.unit} / 二级台账明细</p>
             <h1 className="mt-1 text-3xl font-bold text-slate-950">{config.title}</h1>
             <p className="mt-2 text-base leading-7 text-slate-600">{config.desc}</p>
           </div>

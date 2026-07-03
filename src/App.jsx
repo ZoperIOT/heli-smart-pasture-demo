@@ -28,6 +28,8 @@ import OperationLogs from "./pages/OperationLogs.jsx";
 import MobileWorkbench from "./pages/MobileWorkbench.jsx";
 import KnowledgeBase from "./pages/KnowledgeBase.jsx";
 import SystemPlan from "./pages/SystemPlan.jsx";
+import BusinessWorkbench from "./pages/BusinessWorkbench.jsx";
+import PlatformOverview from "./pages/PlatformOverview.jsx";
 import { DemoProvider } from "./context/DemoContext.jsx";
 
 export default function App() {
@@ -42,6 +44,11 @@ export default function App() {
           <Route path="/cows" element={<Cows />} />
           <Route path="/work-orders" element={<BusinessSection dataKey="workOrders" />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/platform-overview" element={<PlatformOverview />} />
+          <Route path="/dairy-workbench" element={<BusinessWorkbench type="dairy" />} />
+          <Route path="/beef-workbench" element={<BusinessWorkbench type="beef" />} />
+          <Route path="/feed-workbench" element={<BusinessWorkbench type="feed" />} />
+          <Route path="/dairy-plant-workbench" element={<BusinessWorkbench type="dairyPlant" />} />
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/role-simulation" element={<RoleSimulation />} />
           <Route path="/cow-events" element={<CowEvents />} />

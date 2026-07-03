@@ -24,7 +24,8 @@ export const defaultFarmData = {
     defaultDeliveryType: "门店",
     defaultRecorder: "值班员",
     defaultInventoryWarning: 20,
-    currentRole: "集团管理员"
+    currentRole: "集团管理员",
+    currentWorkMode: "经营总览"
   },
   notices: [
     { id: "notice-1", title: "B 区牛舍下午巡检", content: "请 15:00 前完成 B 区牛舍采食、饮水、通风检查。", author: "场长", createdAt: nowText(), pinned: true, type: "生产提醒", status: "显示" },
@@ -270,6 +271,7 @@ export function DemoProvider({ children }) {
     metrics,
     aiReport,
     currentRole: data.settings.currentRole || "集团管理员",
+    currentWorkMode: data.settings.currentWorkMode || "经营总览",
     resetDemo: () => updateData({ ...defaultFarmData, operationLogs: [buildAuditLog({ operator: data.settings.currentRole || "集团管理员", module: "系统设置", action: "重置", objectName: "示例数据", objectId: "demo", summary: "重置为最新平台级示例数据", roleView: data.settings.currentRole || "集团管理员" }), ...(defaultFarmData.operationLogs || [])] }),
     clearAllData: () => {
       clearFarmData();
@@ -280,6 +282,7 @@ export function DemoProvider({ children }) {
     updateSettings: (settings) => updateData((current) => withAudit({ ...current, settings: { ...current.settings, ...settings } }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "系统设置", action: "编辑", objectName: "基础设置", objectId: "settings", summary: "更新系统设置或角色视图", roleView: settings.currentRole || current.settings.currentRole || "集团管理员" }))),
     updateCollection: (key, nextList) => updateData((current) => withAudit({ ...current, [key]: nextList }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: key, action: "编辑", objectName: key, objectId: key, summary: `更新 ${key} 集合，共 ${nextList.length} 条`, roleView: current.settings.currentRole || "集团管理员" }))),
     setCurrentRole: (role) => updateData((current) => withAudit({ ...current, settings: { ...current.settings, currentRole: role } }, buildAuditLog({ operator: role, module: "角色与组织模拟", action: "状态变更", objectName: "当前角色视图", objectId: role, summary: `切换到 ${role} 视图`, roleView: role }))),
+    setCurrentWorkMode: (mode) => updateData((current) => withAudit({ ...current, settings: { ...current.settings, currentWorkMode: mode } }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "工作模式", action: "状态变更", objectName: "当前工作模式", objectId: mode, summary: `切换到 ${mode} 模式`, roleView: current.settings.currentRole || "集团管理员" }))),
     markAllMessagesRead: () => updateData((current) => withAudit({ ...current, messages: current.messages.map((item) => item.status === "未读" ? { ...item, status: "已读" } : item) }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "消息中心", action: "状态变更", objectName: "全部未读消息", objectId: "messages", summary: "一键标记所有未读消息为已读", roleView: current.settings.currentRole || "集团管理员" }))),
     updateMessageStatus: (id, status, handleNote = "") => updateData((current) => withAudit({ ...current, messages: current.messages.map((item) => item.id === id ? { ...item, status, handledAt: ["已处理", "已忽略"].includes(status) ? nowText() : item.handledAt, handleNote: handleNote || item.handleNote } : item) }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "消息中心", action: "状态变更", objectName: "消息", objectId: id, summary: `消息状态变更为 ${status}`, roleView: current.settings.currentRole || "集团管理员" }))),
     upsertApproval: (approval) => updateData((current) => {

@@ -1,14 +1,42 @@
 export const roleMenuAccess = {
   集团管理员: "all",
-  奶牛场场长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/cow-search", "/dairy-cows", "/barns", "/herd-groups", "/feeding-plans", "/feeding-records", "/breeding", "/health-events", "/milk", "/raw-milk-delivery", "/dairy-farm-inventory", "/environment", "/cow-events", "/mobile-workbench", "/knowledge-base", "/system-plan"],
-  肉牛场场长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/cow-search", "/beef-cows", "/beef-batches", "/weight-records", "/feeding-formulas", "/feeding-records", "/beef-sales", "/biological-assets", "/beef-farm-inventory", "/cow-events", "/mobile-workbench", "/knowledge-base", "/system-plan"],
-  饲料厂厂长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/feed-raw-materials", "/feed-products", "/feed-production", "/feed-transfers", "/feed-purchases", "/partners", "/external-interfaces", "/rules", "/mobile-workbench", "/knowledge-base", "/system-plan"],
-  乳品厂厂长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/milk-receiving", "/milk-quality", "/dairy-production-plans", "/dairy-production", "/filling-records", "/finished-quality", "/finished-in", "/finished-out", "/return-records", "/dairy-product-inventory", "/dairy-sales-orders", "/traceability-center", "/external-interfaces", "/mobile-workbench", "/knowledge-base", "/system-plan"],
-  物流主管: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/delivery", "/trucks", "/driver", "/weighbridge", "/external-interfaces", "/mobile-workbench", "/knowledge-base", "/system-plan"],
-  财务人员: ["/", "/dashboard", "/reports", "/ai", "/messages", "/approvals", "/ledger", "/cost-stats", "/profit-analysis", "/analysis", "/operation-logs", "/system-plan"],
-  普通员工: ["/", "/messages", "/work-orders", "/mobile-workbench", "/knowledge-base", "/cow-search"],
-  司机: ["/", "/messages", "/driver", "/delivery", "/trucks", "/mobile-workbench"],
-  只读访客: ["/", "/dashboard", "/reports", "/system-plan"]
+  奶牛场场长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/cow-search", "/dairy-workbench", "/dairy-cows", "/barns", "/herd-groups", "/feeding-plans", "/feeding-records", "/breeding", "/health-events", "/milk", "/raw-milk-delivery", "/dairy-farm-inventory", "/environment", "/cow-events", "/mobile-workbench", "/knowledge-base", "/system-plan", "/platform-overview"],
+  肉牛场场长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/cow-search", "/beef-workbench", "/beef-cows", "/beef-batches", "/weight-records", "/feeding-formulas", "/feeding-records", "/beef-sales", "/biological-assets", "/beef-farm-inventory", "/cow-events", "/mobile-workbench", "/knowledge-base", "/system-plan", "/platform-overview"],
+  饲料厂厂长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/feed-workbench", "/feed-raw-materials", "/feed-products", "/feed-production", "/feed-transfers", "/feed-purchases", "/partners", "/external-interfaces", "/rules", "/mobile-workbench", "/knowledge-base", "/system-plan", "/platform-overview"],
+  乳品厂厂长: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/dairy-plant-workbench", "/milk-receiving", "/milk-quality", "/dairy-production-plans", "/dairy-production", "/filling-records", "/finished-quality", "/finished-in", "/finished-out", "/return-records", "/dairy-product-inventory", "/dairy-sales-orders", "/traceability-center", "/external-interfaces", "/mobile-workbench", "/knowledge-base", "/system-plan", "/platform-overview"],
+  物流主管: ["/", "/dashboard", "/reports", "/ai", "/messages", "/work-orders", "/delivery", "/trucks", "/driver", "/weighbridge", "/external-interfaces", "/mobile-workbench", "/knowledge-base", "/system-plan", "/platform-overview"],
+  财务人员: ["/", "/dashboard", "/reports", "/ai", "/messages", "/approvals", "/ledger", "/cost-stats", "/profit-analysis", "/analysis", "/operation-logs", "/system-plan", "/platform-overview"],
+  普通员工: ["/messages", "/work-orders", "/mobile-workbench", "/knowledge-base", "/cow-search"],
+  司机: ["/messages", "/driver", "/delivery", "/trucks", "/mobile-workbench"],
+  只读访客: ["/", "/dashboard", "/reports", "/system-plan", "/platform-overview"]
+};
+
+export const workModes = ["经营总览", "业务操作", "平台配置"];
+
+export const roleDefaultPath = {
+  集团管理员: "/",
+  奶牛场场长: "/dairy-workbench",
+  肉牛场场长: "/beef-workbench",
+  饲料厂厂长: "/feed-workbench",
+  乳品厂厂长: "/dairy-plant-workbench",
+  物流主管: "/delivery",
+  财务人员: "/reports",
+  普通员工: "/mobile-workbench",
+  司机: "/delivery",
+  只读访客: "/platform-overview"
+};
+
+export const roleDefaultMode = {
+  集团管理员: "经营总览",
+  奶牛场场长: "经营总览",
+  肉牛场场长: "经营总览",
+  饲料厂厂长: "经营总览",
+  乳品厂厂长: "经营总览",
+  物流主管: "业务操作",
+  财务人员: "经营总览",
+  普通员工: "业务操作",
+  司机: "业务操作",
+  只读访客: "经营总览"
 };
 
 export function canAccessPath(role, path) {
@@ -21,6 +49,11 @@ export function filterMenuGroupsByRole(groups, role) {
   return groups
     .map((group) => ({ ...group, items: group.items.filter((item) => canAccessPath(role, item.to)) }))
     .filter((group) => group.items.length);
+}
+
+export function filterMenuGroups(groups, role, mode) {
+  const byMode = groups.filter((group) => group.modes?.includes(mode));
+  return filterMenuGroupsByRole(byMode, role);
 }
 
 export function isReadonlyRole(role) {
