@@ -12,6 +12,7 @@ import {
   Sprout,
   Truck
 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BarRankChart, TrendChart } from "../components/ChartCard.jsx";
 import SectionTitle from "../components/SectionTitle.jsx";
@@ -89,9 +90,13 @@ const workspaceConfig = {
 
 export default function BusinessWorkbench({ type }) {
   const demo = useDemo();
+  const [historyStatus, setHistoryStatus] = useState("全部");
   const config = workspaceConfig[type] || workspaceConfig.dairy;
   const stats = buildStats(type, demo);
-  const recentWorkOrders = (demo.data.workOrders || []).filter((item) => item.businessUnit === config.eyebrow).slice(0, 4);
+  const unitOrders = (demo.data.workOrders || []).filter((item) => item.businessUnit === config.eyebrow);
+  const todayOrders = unitOrders.filter((item) => String(item.plannedAt || "").startsWith(new Date().toISOString().slice(0, 10)));
+  const runningOrders = unitOrders.filter((item) => ["待处理", "处理中", "待执行", "执行中", "待审批"].includes(item.status));
+  const historyOrders = unitOrders.filter((item) => historyStatus === "全部" || item.status === historyStatus).slice(0, 6);
   const recentMessages = (demo.data.messages || []).filter((item) => item.businessUnit === config.eyebrow || item.businessUnit === "集团").slice(0, 4);
   const aiText = buildSuggestion(type, demo);
 
@@ -100,15 +105,30 @@ export default function BusinessWorkbench({ type }) {
       <PageHeader eyebrow={config.eyebrow} title={config.title} description={config.description} action={<Link to="/ai" className="rounded-[8px] bg-slate-900 px-4 py-3 text-base font-bold text-white">问 AI 助手</Link>} />
       <StatGrid items={stats.cards} columns="md:grid-cols-4" />
 
+      <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <TaskPanel title="今日待办" items={todayOrders} empty="今日暂无待办工单。" />
+        <TaskPanel title="进行中工单" items={runningOrders} empty="暂无进行中工单。" />
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
           <SectionTitle title={stats.chartTitle} />
           {stats.chartData.length ? stats.chartType === "bar" ? <BarRankChart data={stats.chartData} /> : <TrendChart data={stats.chartData} /> : <EmptyState />}
         </div>
         <div className="space-y-4">
-          <Panel title="最近工单" items={recentWorkOrders.map((item) => `${item.type}：${item.content}（${item.status}）`)} />
           <Panel title="消息预警" items={recentMessages.map((item) => `${item.priority}：${item.title}`)} />
+          <Panel title="最近业务动态" items={buildActivities(type, demo)} />
         </div>
+      </section>
+
+      <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle title="历史工单" />
+          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)} className="min-h-11 rounded-[8px] border border-slate-200 bg-white px-3 font-bold text-slate-700">
+            {["全部", "待处理", "处理中", "待审批", "待执行", "执行中", "已完成", "已驳回", "已取消", "超时"].map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </div>
+        <TaskTable items={historyOrders} />
       </section>
 
       <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
@@ -122,6 +142,71 @@ export default function BusinessWorkbench({ type }) {
       </section>
     </PageShell>
   );
+}
+
+function TaskPanel({ title, items, empty }) {
+  return (
+    <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
+      <SectionTitle title={title} />
+      <div className="space-y-3">
+        {items.slice(0, 5).map((item) => (
+          <Link key={item.id} to="/work-orders" className="block rounded-[8px] bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-pasture-700">{item.no || item.id} · {item.type}</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-950">{item.content}</h3>
+                <p className="mt-1 text-sm font-bold text-slate-500">处理人：{item.owner} · 计划：{item.plannedAt}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${statusClass(item.status)}`}>{item.status}</span>
+            </div>
+          </Link>
+        ))}
+        {!items.length && <EmptyState text={empty} />}
+      </div>
+    </section>
+  );
+}
+
+function TaskTable({ items }) {
+  if (!items.length) return <EmptyState text="暂无历史工单。" />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[860px] border-separate border-spacing-y-2 text-left">
+        <thead className="text-sm text-slate-500">
+          <tr>{["工单", "业务类型", "状态", "发起人", "处理人", "组织", "时间", "备注"].map((head) => <th key={head} className="px-3 py-2 font-black">{head}</th>)}</tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className="bg-slate-50 text-base">
+              <td className="px-3 py-3 font-bold text-slate-900">{item.no || item.id}</td>
+              <td className="px-3 py-3">{item.type}</td>
+              <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(item.status)}`}>{item.status}</span></td>
+              <td className="px-3 py-3">{item.applicant || "系统"}</td>
+              <td className="px-3 py-3">{item.owner}</td>
+              <td className="px-3 py-3">{item.businessUnit}</td>
+              <td className="px-3 py-3">{item.plannedAt}</td>
+              <td className="px-3 py-3">{item.note || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function statusClass(status = "") {
+  if (["已完成", "在线", "正常"].includes(status)) return "bg-emerald-100 text-pasture-800";
+  if (["处理中", "执行中", "配送中", "待处理"].includes(status)) return "bg-sky-100 text-sky-800";
+  if (["待审批", "待执行", "即将到期"].includes(status)) return "bg-amber-100 text-amber-800";
+  if (["异常", "超时", "离线", "已驳回"].includes(status)) return "bg-red-100 text-red-700";
+  return "bg-slate-200 text-slate-700";
+}
+
+function buildActivities(type, demo) {
+  if (type === "dairy") return (demo.data.cowEvents || []).filter((item) => item.businessUnit === "合力牧业奶牛场").slice(0, 4).map((item) => `${item.code}：${item.type}，${item.content}`);
+  if (type === "beef") return (demo.data.cowEvents || []).filter((item) => item.businessUnit === "欧力菲德肉牛场").slice(0, 4).map((item) => `${item.code}：${item.type}，${item.content}`);
+  if (type === "feed") return (demo.data.feedProductionRecords || []).slice(0, 4).map((item) => `${item.feedName} 生产 ${item.quantity}${item.unit}`);
+  return (demo.data.dairyProductionBatches || []).slice(0, 4).map((item) => `${item.productName} 生产 ${item.quantity}${item.unit}`);
 }
 
 function buildStats(type, demo) {

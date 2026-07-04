@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDemo } from "../context/DemoContext.jsx";
-import { filterMenuGroups, roleDefaultMode, roleDefaultPath, summarizeRoleScope, workModes } from "../services/roleViewService.js";
+import { filterMenuGroups, getRoleOrganization, roleDefaultMode, roleDefaultPath, summarizeRoleScope, workModes } from "../services/roleViewService.js";
 import { roleOptions } from "../data/platformModules.js";
 
 const menuGroups = [
@@ -61,7 +61,7 @@ const menuGroups = [
   },
   {
     title: "风险与待办",
-    modes: ["经营总览"],
+    modes: ["经营总览", "消息流"],
     items: [
       { to: "/messages", label: "消息预警", icon: MessageSquareWarning },
       { to: "/work-orders", label: "工单中心", icon: ClipboardList },
@@ -70,7 +70,7 @@ const menuGroups = [
   },
   {
     title: "今日工作",
-    modes: ["业务操作"],
+    modes: ["业务流"],
     items: [
       { to: "/mobile-workbench", label: "员工工作台", icon: Smartphone },
       { to: "/work-orders", label: "工单中心", icon: ClipboardList },
@@ -79,7 +79,7 @@ const menuGroups = [
   },
   {
     title: "生产操作",
-    modes: ["业务操作"],
+    modes: ["业务流"],
     items: [
       { to: "/milk", label: "产奶记录", icon: Milk },
       { to: "/feeding-records", label: "饲喂执行", icon: PackageMinus },
@@ -90,8 +90,8 @@ const menuGroups = [
     ]
   },
   {
-    title: "库存物流",
-    modes: ["业务操作"],
+    title: "配送与调拨",
+    modes: ["业务流"],
     items: [
       { to: "/stock-in", label: "入库记录", icon: PackagePlus },
       { to: "/stock-out", label: "出库记录", icon: PackageMinus },
@@ -101,20 +101,60 @@ const menuGroups = [
     ]
   },
   {
+    title: "资金核算",
+    modes: ["资金流"],
+    items: [
+      { to: "/ledger", label: "收支账本", icon: ReceiptText },
+      { to: "/cost-stats", label: "成本统计", icon: BarChart3 },
+      { to: "/profit-analysis", label: "利润分析", icon: BarChart3 },
+      { to: "/reports", label: "经营报表中心", icon: BarChart3 },
+      { to: "/approvals", label: "大额支出审批", icon: ShieldCheck }
+    ]
+  },
+  {
+    title: "经营数据",
+    modes: ["数据流"],
+    items: [
+      { to: "/reports", label: "经营报表中心", icon: BarChart3 },
+      { to: "/analysis", label: "自定义分析", icon: BarChart3 },
+      { to: "/traceability-center", label: "质量追溯", icon: Route },
+      { to: "/operation-logs", label: "操作日志", icon: FileText },
+      { to: "/platform-overview", label: "平台能力总览", icon: FileText }
+    ]
+  },
+  {
+    title: "接口与未来扩展",
+    modes: ["数据流"],
+    items: [
+      { to: "/external-interfaces", label: "接口管理中心", icon: PlugZap },
+      { to: "/devices", label: "设备状态示例", icon: Cpu },
+      { to: "/environment", label: "环境监控示例", icon: BarChart3 }
+    ]
+  },
+  {
+    title: "消息协同",
+    modes: ["消息流"],
+    items: [
+      { to: "/messages", label: "消息预警", icon: MessageSquareWarning },
+      { to: "/work-orders", label: "工单中心", icon: ClipboardList },
+      { to: "/approvals", label: "审批中心", icon: ShieldCheck },
+      { to: "/mobile-workbench", label: "员工工作台", icon: Smartphone }
+    ]
+  },
+  {
     title: "平台能力",
-    modes: ["平台配置"],
+    modes: ["权限与配置"],
     items: [
       { to: "/platform-overview", label: "平台能力总览", icon: FileText },
       { to: "/system-plan", label: "系统建设方案", icon: FileText },
       { to: "/external-interfaces", label: "接口管理中心", icon: PlugZap },
       { to: "/rules", label: "规则中心", icon: ShieldCheck },
-      { to: "/analysis", label: "自定义分析", icon: BarChart3 },
-      { to: "/traceability-center", label: "质量追溯", icon: Route }
+      { to: "/analysis", label: "自定义分析", icon: BarChart3 }
     ]
   },
   {
     title: "基础资料",
-    modes: ["平台配置"],
+    modes: ["权限与配置"],
     items: [
       { to: "/partners", label: "客户供应商", icon: Building2 },
       { to: "/employees", label: "员工岗位", icon: ClipboardList },
@@ -124,7 +164,7 @@ const menuGroups = [
   },
   {
     title: "系统维护",
-    modes: ["平台配置"],
+    modes: ["权限与配置"],
     items: [
       { to: "/role-simulation", label: "角色组织模拟", icon: UserCog },
       { to: "/operation-logs", label: "操作日志", icon: FileText },
@@ -134,7 +174,7 @@ const menuGroups = [
   },
   {
     title: "二级明细入口",
-    modes: ["经营总览", "业务操作", "平台配置"],
+    modes: ["经营总览", "业务流", "资金流", "数据流", "消息流", "权限与配置"],
     secondary: true,
     items: [
       { to: "/cow-search", label: "牛只查询中心", icon: Search },
@@ -213,7 +253,10 @@ export default function Layout() {
             </button>
             <div className="min-w-0 flex-1">
               <p className="truncate text-2xl font-bold text-slate-950">{titles[location.pathname] || "合力牧业农牧乳一体化经营管理平台"}</p>
-              <p className="truncate text-sm font-semibold text-slate-500">{currentMode} · {demo.currentRole} · {summarizeRoleScope(demo.currentRole)}</p>
+              <p className="truncate text-sm font-semibold text-slate-500">{currentMode} · {getRoleOrganization(demo.currentRole)} · {summarizeRoleScope(demo.currentRole)}</p>
+            </div>
+            <div className="hidden min-w-[180px] rounded-[8px] bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-100 2xl:block">
+              当前组织：{getRoleOrganization(demo.currentRole)}
             </div>
             <div className="hidden gap-2 xl:flex">
               {workModes.map((mode) => (

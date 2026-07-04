@@ -7,10 +7,12 @@ import PageShell from "../components/common/PageShell.jsx";
 import StatGrid from "../components/common/StatGrid.jsx";
 import { useDemo } from "../context/DemoContext.jsx";
 import { buildSimpleReport } from "../data/demoFlow.js";
+import { getRoleOrganization } from "../services/roleViewService.js";
 
 export default function Home() {
   const demo = useDemo();
   const { metrics, data } = demo;
+  const currentOrganization = getRoleOrganization(metrics.currentRole);
   const milkTrend = data.milkRecords.slice(0, 7).reverse().map((item) => ({ day: item.date.slice(5), milk: Number(item.total || 0) }));
   const unitIncome = (metrics.businessUnitStats || []).filter((item) => item.name !== "集团").map((item) => ({ name: item.name, value: item.income }));
 
@@ -51,7 +53,7 @@ export default function Home() {
         dark
         eyebrow={data.settings.farmName}
         title="集团经营驾驶舱"
-        description={`当前角色：${metrics.currentRole}。首页只聚焦生产、异常、任务和四大板块运行状态，具体台账从各工作台进入。`}
+        description={`当前角色：${metrics.currentRole}，当前组织：${currentOrganization}。首页聚焦生产、异常、任务和四大板块运行状态，具体台账从各工作台进入。`}
         action={
           <button onClick={() => window.confirm("确定重置为示例数据吗？") && demo.resetDemo()} className="flex min-h-11 items-center gap-2 rounded-[8px] bg-white px-4 font-bold text-slate-950">
             <RotateCcw size={20} /> 重置示例数据

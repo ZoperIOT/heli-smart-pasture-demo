@@ -10,6 +10,9 @@ const chartColors = ["#0f766e", "#0ea5e9", "#f59e0b", "#6366f1", "#ef4444", "#14
 export default function Reports() {
   const demo = useDemo();
   const [range, setRange] = useState("本月");
+  const [reportType, setReportType] = useState("集团利润报表");
+  const [organization, setOrganization] = useState("全部组织");
+  const [businessType, setBusinessType] = useState("全部业务");
 
   const milkTrend = demo.data.milkRecords.slice(0, range === "今日" ? 1 : range === "本周" ? 7 : 30).reverse().map((item) => ({ day: item.date.slice(5) || item.date, milk: Number(item.total || 0) }));
   const barnMilk = groupSum(demo.data.milkRecords, "barn", "total").map((item) => ({ name: item.name || "未分配", sales: item.value }));
@@ -76,13 +79,24 @@ export default function Reports() {
       <section className="rounded-[8px] bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-950">集团经营报表</h1>
-            <p className="mt-2 text-base text-slate-600">按合力牧业奶牛场、欧力菲德肉牛场、欧力菲德饲料厂、欧力菲德乳品厂展示生产、库存、配送和财务分析。</p>
+            <h1 className="text-3xl font-bold text-slate-950">经营报表中心</h1>
+            <p className="mt-2 text-base text-slate-600">从业务记录汇总收入、成本、产量、库存、质检、订单、应收应付和生物资产，模拟企业级报表中心。</p>
           </div>
           <button onClick={exportCsv} className="flex min-h-11 items-center gap-2 rounded-[8px] bg-slate-900 px-4 font-bold text-white"><Download size={20} /> 导出 CSV</button>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["今日", "本周", "本月"].map((item) => <button key={item} onClick={() => setRange(item)} className={`rounded-[8px] px-4 py-2 font-bold ${range === item ? "bg-pasture-700 text-white" : "bg-slate-100 text-slate-700"}`}>{item}</button>)}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <select value={reportType} onChange={(event) => setReportType(event.target.value)} className="input-lg">
+            {["集团利润报表", "分板块利润报表", "原奶产量报表", "饲料成本报表", "乳品生产损耗报表", "销售订单报表", "应收应付报表", "库存周转报表", "质检合格率报表", "牛只生物资产报表"].map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <select value={organization} onChange={(event) => setOrganization(event.target.value)} className="input-lg">
+            {["全部组织", "合力牧业奶牛场", "欧力菲德肉牛场", "欧力菲德饲料厂", "欧力菲德乳品厂", "集团"].map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <select value={businessType} onChange={(event) => setBusinessType(event.target.value)} className="input-lg">
+            {["全部业务", "产奶", "饲料生产", "质检", "生产批次", "销售订单", "采购", "配送", "账本"].map((item) => <option key={item}>{item}</option>)}
+          </select>
         </div>
       </section>
 
@@ -123,19 +137,45 @@ export default function Reports() {
         <ChartPanel title="接口状态分布">{interfaceStatusShare.length ? <><SharePie data={interfaceStatusShare} /><Legend items={interfaceStatusShare} unit="个" /></> : <Empty />}</ChartPanel>
         <ChartPanel title="分角色工作量统计">{employeeWorkload.length ? <BarRankChart data={employeeWorkload} /> : <Empty />}</ChartPanel>
         <ChartPanel title="数据质量趋势">{dataQualityTrend.length ? <TrendChart data={dataQualityTrend} /> : <Empty />}</ChartPanel>
-        <ChartPanel title="四流合一链路">
+        <ChartPanel title="五流合一链路">
           <FlowList items={[
             `业务流：今日工单 ${demo.metrics.todayWorkOrders} 个，原奶接收 ${demo.metrics.rawMilkReceivedToday.toFixed(1)} 吨，乳品销售 ${(demo.metrics.dairySalesToday / 10000).toFixed(1)} 万元`,
-            `物流流：配送任务 ${demo.metrics.destinationCount} 单，今日过磅 ${demo.metrics.weighbridgeToday} 单`,
             `资金流：本月收入 ${(demo.metrics.monthIncome / 10000).toFixed(1)} 万元，支出 ${(demo.metrics.monthExpense / 10000).toFixed(1)} 万元`,
-            `数据流：设备 ${(demo.data.devices || []).length} 台，追溯完整链路 ${demo.metrics.traceabilityComplete} 条`
+            `数据流：报表模板 ${(demo.data.analysisTemplates || []).length} 个，追溯完整链路 ${demo.metrics.traceabilityComplete} 条`,
+            `消息流：未读消息 ${demo.metrics.unreadMessages} 条，待审批 ${demo.metrics.pendingApprovals} 条`,
+            `权限流：当前角色 ${demo.metrics.currentRole}，当前组织视图已按角色收敛`
           ]} />
         </ChartPanel>
+        <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100 xl:col-span-2">
+          <SectionTitle title={`${reportType}明细`} eyebrow={`${range} / ${organization} / ${businessType}`} />
+          <ReportTable rows={buildReportRows(demo, reportType)} />
+        </section>
         <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
           <SectionTitle title="库存预警列表" />
           {demo.metrics.inventoryWarnings.length ? demo.metrics.inventoryWarnings.map((item) => <p key={item.id} className="mb-2 rounded-[8px] bg-red-50 p-3 font-bold text-red-700">{item.name}：库存 {item.stock}{item.unit}，预警 {item.warningStock}{item.unit}</p>) : <Empty />}
         </section>
       </div>
+    </div>
+  );
+}
+
+function buildReportRows(demo, reportType) {
+  if (reportType.includes("销售")) return (demo.data.dairySalesOrders || []).map((item) => ({ name: item.customer, type: item.productName, value: item.total, status: item.syncLedger ? "已入账" : "待入账", link: "/dairy-sales-orders" }));
+  if (reportType.includes("应收")) return (demo.data.ledgerRecords || []).filter((item) => item.type === "收入").map((item) => ({ name: item.businessUnit, type: item.category, value: item.amount, status: "已生成", link: "/ledger" }));
+  if (reportType.includes("库存")) return [...(demo.data.feedRawMaterials || []), ...(demo.data.feedProducts || []), ...(demo.data.dairyProductInventory || [])].map((item) => ({ name: item.name, type: item.category || item.type || item.target, value: item.stock, status: Number(item.stock || 0) <= Number(item.warningStock || 0) ? "预警" : "正常", link: "/inventory" }));
+  if (reportType.includes("质检")) return (demo.data.milkQualityRecords || []).map((item) => ({ name: item.batch, type: "原奶质检", value: item.temperature, status: item.passed ? "合格" : "不合格", link: "/milk-quality" }));
+  if (reportType.includes("生物资产")) return (demo.data.biologicalAssets || []).map((item) => ({ name: item.code, type: item.batch, value: item.estimatedValue, status: item.readyForSale === "是" ? "可出栏" : "育肥中", link: "/biological-assets" }));
+  return (demo.metrics.businessUnitStats || []).map((item) => ({ name: item.name, type: "收入/支出/利润", value: item.profit, status: item.profit >= 0 ? "盈利" : "亏损", link: "/ledger" }));
+}
+
+function ReportTable({ rows }) {
+  if (!rows.length) return <Empty />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-left">
+        <thead className="text-sm text-slate-500"><tr>{["对象", "类型", "指标值", "状态", "下钻"].map((item) => <th key={item} className="px-3 py-2 font-black">{item}</th>)}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={`${row.name}-${index}`} className="bg-slate-50 text-base"><td className="px-3 py-3 font-bold">{row.name}</td><td className="px-3 py-3">{row.type}</td><td className="px-3 py-3">{Number(row.value || 0).toLocaleString()}</td><td className="px-3 py-3">{row.status}</td><td className="px-3 py-3"><a href={row.link} className="font-bold text-pasture-700">查看明细</a></td></tr>)}</tbody>
+      </table>
     </div>
   );
 }

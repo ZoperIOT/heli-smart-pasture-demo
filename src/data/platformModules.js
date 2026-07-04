@@ -8,7 +8,10 @@ export const platformModuleKeys = [
   "externalInterfaces",
   "knowledgeBase",
   "roleViews",
-  "mobileTasks"
+  "mobileTasks",
+  "receivables",
+  "payables",
+  "reportSnapshots"
 ];
 
 export const roleOptions = [
@@ -99,6 +102,16 @@ export function buildPlatformModules(todayText, monthText, nowText) {
       { id: "mt-2", title: "晚班挤奶录入", type: "产奶录入", businessUnit: "合力牧业奶牛场", owner: "赵师傅", plannedAt: `${todayText} 18:00`, status: "待处理", quickAction: "录入产奶", note: "关联 WO-MILK-002" },
       { id: "mt-3", title: "原奶配送到欧力菲德乳品厂", type: "配送任务", businessUnit: "物流车辆", owner: "王师傅", plannedAt: `${todayText} 09:00`, status: "配送中", quickAction: "确认到达", note: "关联 YN-001" },
       { id: "mt-4", title: "B区环境异常上报", type: "异常上报", businessUnit: "合力牧业奶牛场", owner: "刘师傅", plannedAt: `${todayText} 10:30`, status: "待处理", quickAction: "填写异常", note: "模拟移动端上报" }
+    ],
+    receivables: [
+      { id: "ar-1", code: "AR-20260703-001", organizationId: "org-dairy-plant", organizationName: "欧力菲德乳品厂", businessType: "乳品销售", customer: "城区自有门店", relatedBill: "dairy-order-1", amount: 7800, receivedAmount: 3000, balance: 4800, status: "部分收款", dueDate: `${monthText}-28`, createdAt: todayText, updatedAt: todayText, createdBy: "销售", updatedBy: "财务人员", remark: "销售订单形成应收" },
+      { id: "ar-2", code: "AR-20260703-002", organizationId: "org-beef", organizationName: "欧力菲德肉牛场", businessType: "肉牛销售", customer: "本地肉联厂", relatedBill: "beef-sale-1", amount: 186000, receivedAmount: 186000, balance: 0, status: "已收款", dueDate: `${monthText}-25`, createdAt: todayText, updatedAt: todayText, createdBy: "财务", updatedBy: "财务人员", remark: "肉牛出栏收入" }
+    ],
+    payables: [
+      { id: "ap-pay-1", code: "APAY-20260703-001", organizationId: "org-feed", organizationName: "欧力菲德饲料厂", businessType: "原料采购", supplier: "山东粮贸公司", relatedBill: "in-1", amount: 25600, paidAmount: 0, balance: 25600, status: "待付款", dueDate: `${monthText}-30`, createdAt: todayText, updatedAt: todayText, createdBy: "库管", updatedBy: "财务人员", remark: "采购记录形成应付" }
+    ],
+    reportSnapshots: [
+      { id: "snap-1", code: "RPT-20260703-001", organizationId: "org-group", organizationName: "集团", businessType: "集团日报", status: "已生成", createdAt: todayText, updatedAt: todayText, createdBy: "系统", updatedBy: "系统", revenue: 314920, cost: 27320, profit: 287600, remark: "由 mock 业务记录汇总生成" }
     ]
   };
 }

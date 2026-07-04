@@ -24,7 +24,7 @@ export default function IntegrationCenter() {
       <section className="rounded-[8px] bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-pasture-700">设备流 / 外部系统集成</p>
+            <p className="text-sm font-black text-pasture-700">数据流 / 外部系统集成</p>
             <h1 className="mt-1 text-3xl font-bold text-slate-950">接口管理中心</h1>
             <p className="mt-2 text-base leading-7 text-slate-600">配置奶厅、TMR、称重、地磅、耳标、环境、ERP、MES、财务、小程序和 AI 接口占位，测试连接只改变前端状态。</p>
           </div>

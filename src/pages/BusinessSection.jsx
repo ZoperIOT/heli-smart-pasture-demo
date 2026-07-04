@@ -6,9 +6,9 @@ import { extendedSectionConfigs } from "../data/extendedSectionConfigs.js";
 import { isReadonlyRole } from "../services/roleViewService.js";
 
 const configs = {
-  dairyCows: { unit: "合力牧业奶牛场", title: "奶牛档案", desc: "合力牧业奶牛场奶牛耳标、牛舍、品种、月龄、状态和重点关注信息。", fields: ["code", "barn", "breed", "monthAge", "status", "personInCharge"], labels: ["耳标", "牛舍", "品种", "月龄", "状态", "负责人"], sample: { code: "HL-N-NEW", barn: "A区泌乳牛舍", breed: "荷斯坦", monthAge: 30, status: "健康", watch: false, personInCharge: "刘师傅", note: "新增示例奶牛" } },
-  beefCows: { unit: "欧力菲德肉牛场", title: "肉牛档案", desc: "欧力菲德肉牛场肉牛耳标、圈舍、品种、体重、育肥批次和负责人。", fields: ["code", "pen", "breed", "monthAge", "weight", "status", "batch"], labels: ["耳标", "圈舍", "品种", "月龄", "体重", "状态", "批次"], sample: { code: "OLF-R-NEW", pen: "欧力菲德肉牛育肥一区", breed: "西门塔尔", monthAge: 18, weight: 480, status: "育肥中", batch: "2026春季育肥批次", personInCharge: "周师傅", note: "新增示例肉牛" } },
-  beefBatches: { unit: "欧力菲德肉牛场", title: "育肥批次", desc: "展示欧力菲德肉牛场育肥批次、入栏数量、当前数量、平均体重、成本和预计收入。", fields: ["name", "entryDate", "entryCount", "currentCount", "avgWeight", "feedCost", "expectedIncome"], labels: ["批次", "入栏日期", "入栏数", "当前数", "均重", "饲料成本", "预计收入"], sample: { name: "新增育肥批次", entryDate: new Date().toISOString().slice(0, 10), entryCount: 60, currentCount: 60, avgWeight: 420, targetOutDate: "2026-11-30", feedCost: 0, expectedIncome: 360000, note: "新增示例批次" } },
+  dairyCows: { unit: "合力牧业奶牛场", title: "奶牛档案", desc: "合力牧业奶牛场奶牛耳标、牛舍、品种、月龄、状态和重点关注信息。", fields: ["code", "barn", "breed", "monthAge", "status", "personInCharge"], labels: ["耳标", "牛舍", "品种", "月龄", "状态", "负责人"], sample: { code: "HL-N-NEW", barn: "A区泌乳牛舍", breed: "荷斯坦", monthAge: 30, status: "健康", watch: false, personInCharge: "刘师傅", note: "现场补录奶牛档案" } },
+  beefCows: { unit: "欧力菲德肉牛场", title: "肉牛档案", desc: "欧力菲德肉牛场肉牛耳标、圈舍、品种、体重、育肥批次和负责人。", fields: ["code", "pen", "breed", "monthAge", "weight", "status", "batch"], labels: ["耳标", "圈舍", "品种", "月龄", "体重", "状态", "批次"], sample: { code: "OLF-R-NEW", pen: "欧力菲德肉牛育肥一区", breed: "西门塔尔", monthAge: 18, weight: 480, status: "育肥中", batch: "2026春季育肥批次", personInCharge: "周师傅", note: "现场补录肉牛档案" } },
+  beefBatches: { unit: "欧力菲德肉牛场", title: "育肥批次", desc: "展示欧力菲德肉牛场育肥批次、入栏数量、当前数量、平均体重、成本和预计收入。", fields: ["name", "entryDate", "entryCount", "currentCount", "avgWeight", "feedCost", "expectedIncome"], labels: ["批次", "入栏日期", "入栏数", "当前数", "均重", "饲料成本", "预计收入"], sample: { name: "新增育肥批次", entryDate: new Date().toISOString().slice(0, 10), entryCount: 60, currentCount: 60, avgWeight: 420, targetOutDate: "2026-11-30", feedCost: 0, expectedIncome: 360000, note: "春季补栏批次登记" } },
   weightRecords: { unit: "欧力菲德肉牛场", title: "体重记录", desc: "记录肉牛耳标或育肥批次的体重变化和增重情况。", fields: ["date", "target", "weight", "gain", "recorder"], labels: ["日期", "对象", "体重", "增重", "记录人"], sample: { date: new Date().toISOString().slice(0, 10), target: "2026春季育肥批次", weight: 520, gain: 12, recorder: "周师傅", note: "新增称重记录" } },
   beefSales: { unit: "欧力菲德肉牛场", title: "出栏销售", desc: "欧力菲德肉牛场出栏销售记录，可同步生成肉牛销售收入。", fields: ["date", "target", "count", "avgWeight", "unitPrice", "total", "customer"], labels: ["日期", "批次/耳标", "出栏数", "均重", "单价", "总额", "客户"], sample: { date: new Date().toISOString().slice(0, 10), target: "2026春季育肥批次", count: 10, avgWeight: 640, unitPrice: 16, total: 102400, customer: "本地肉联厂", syncLedger: true, note: "新增出栏销售" } },
   dairyFarmInventory: { unit: "合力牧业奶牛场", title: "奶牛场库存", desc: "合力牧业奶牛场饲料、兽药等库存，可来自欧力菲德饲料厂内部调拨。", fields: ["name", "category", "stock", "unit", "warningStock", "source"], labels: ["物资", "分类", "库存", "单位", "预警", "来源"], sample: { name: "奶牛精补料", category: "饲料", stock: 10, unit: "吨", warningStock: 20, source: "欧力菲德饲料厂内部调拨", note: "新增库存" } },
@@ -41,9 +41,24 @@ export default function BusinessSection({ dataKey }) {
   }
 
   function addSample() {
-    const next = [{ ...config.sample, id: `${dataKey}-${Date.now()}` }, ...records];
+    const record = { ...config.sample, id: `${dataKey}-${Date.now()}`, createdAt: new Date().toLocaleString("zh-CN", { hour12: false }), updatedAt: new Date().toLocaleString("zh-CN", { hour12: false }), createdBy: demo.currentRole, updatedBy: demo.currentRole, organizationName: config.unit, status: config.sample.status || "待处理" };
+    const next = [record, ...records];
     demo.updateCollection(dataKey, next);
-    alert("已新增一条示例记录");
+    applyBusinessSideEffects(record);
+    alert(`已${actionText(dataKey, config.title)}`);
+  }
+
+  function applyBusinessSideEffects(record) {
+    const now = new Date().toLocaleString("zh-CN", { hour12: false });
+    if (dataKey === "milkRecords") {
+      demo.updateCollection("messages", [{ id: `msg-${Date.now()}`, type: "系统通知", businessUnit: "欧力菲德乳品厂", title: "奶牛场已提交产奶记录", content: "合力牧业奶牛场新增产奶记录，乳品厂可准备原奶接收。", priority: "中", status: "未读", receiver: "乳品厂厂长", relatedType: "产奶记录", relatedId: record.id, createdAt: now, handledAt: "", handleNote: "" }, ...(demo.data.messages || [])]);
+    }
+    if (dataKey === "milkQualityRecords" && record.passed === false) {
+      demo.updateCollection("workOrders", [{ id: `wo-${Date.now()}`, no: `WO-QA-${Date.now().toString().slice(-5)}`, type: "质检异常工单", businessUnit: "欧力菲德乳品厂", content: "质检不合格，请联动奶牛场复核原奶批次。", owner: "质检员", plannedAt: now, finishedAt: "", status: "待处理", priority: "高", relatedBusiness: "质检记录", relatedId: record.id, note: "由质检记录自动生成" }, ...(demo.data.workOrders || [])]);
+    }
+    if (dataKey === "dairySalesOrders") {
+      demo.updateCollection("ledgerRecords", [{ id: `ledger-${Date.now()}`, date: new Date().toISOString().slice(0, 10), businessUnit: "欧力菲德乳品厂", type: "收入", category: "乳品销售应收", amount: Number(record.total || record.amount || 0), operator: demo.currentRole, relatedBusiness: "销售订单", relatedId: record.id, note: "销售订单自动形成应收收入" }, ...(demo.data.ledgerRecords || [])]);
+    }
   }
 
   function removeRecord(id) {
@@ -63,7 +78,7 @@ export default function BusinessSection({ dataKey }) {
           </div>
           {!readonly && (
             <button onClick={addSample} className="flex min-h-11 items-center gap-2 rounded-[8px] bg-pasture-700 px-4 font-bold text-white">
-              <Plus size={20} /> 新增示例
+              <Plus size={20} /> {actionText(dataKey, config.title)}
             </button>
           )}
         </div>
@@ -108,6 +123,24 @@ export default function BusinessSection({ dataKey }) {
       </section>
     </div>
   );
+}
+
+function actionText(dataKey, title) {
+  const map = {
+    milkRecords: "新增产奶记录",
+    feedingRecords: "提交饲喂执行",
+    milkReceivingRecords: "确认原奶接收",
+    milkQualityRecords: "提交质检单",
+    feedProductionRecords: "新增饲料生产单",
+    dairyProductionBatches: "新增生产批次",
+    finishedInRecords: "生成入库单",
+    finishedOutRecords: "生成出库单",
+    dairySalesOrders: "新增销售订单",
+    workOrders: "新增工单",
+    messages: "新增消息",
+    approvalRequests: "发起审批"
+  };
+  return map[dataKey] || `新增${title}`;
 }
 
 function formatValue(value) {

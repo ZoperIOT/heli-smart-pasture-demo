@@ -11,7 +11,7 @@ export const roleMenuAccess = {
   只读访客: ["/", "/dashboard", "/reports", "/system-plan", "/platform-overview"]
 };
 
-export const workModes = ["经营总览", "业务操作", "平台配置"];
+export const workModes = ["经营总览", "业务流", "资金流", "数据流", "消息流", "权限与配置"];
 
 export const roleDefaultPath = {
   集团管理员: "/",
@@ -32,11 +32,24 @@ export const roleDefaultMode = {
   肉牛场场长: "经营总览",
   饲料厂厂长: "经营总览",
   乳品厂厂长: "经营总览",
-  物流主管: "业务操作",
-  财务人员: "经营总览",
-  普通员工: "业务操作",
-  司机: "业务操作",
+  物流主管: "业务流",
+  财务人员: "资金流",
+  普通员工: "业务流",
+  司机: "业务流",
   只读访客: "经营总览"
+};
+
+export const roleOrganization = {
+  集团管理员: "合力牧业集团",
+  奶牛场场长: "合力牧业奶牛场",
+  肉牛场场长: "欧力菲德肉牛场",
+  饲料厂厂长: "欧力菲德饲料厂",
+  乳品厂厂长: "欧力菲德乳品厂",
+  物流主管: "物流车辆",
+  财务人员: "财务经营",
+  普通员工: "合力牧业集团",
+  司机: "物流车辆",
+  只读访客: "合力牧业集团"
 };
 
 export function canAccessPath(role, path) {
@@ -74,4 +87,8 @@ export function summarizeRoleScope(role) {
     只读访客: "只读查看首页、大屏、报表和建设方案"
   };
   return map[role] || map["集团管理员"];
+}
+
+export function getRoleOrganization(role) {
+  return roleOrganization[role] || "合力牧业集团";
 }

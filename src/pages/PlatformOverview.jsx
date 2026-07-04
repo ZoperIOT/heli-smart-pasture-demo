@@ -14,12 +14,10 @@ const businessUnits = [
 
 const flows = [
   ["业务流", "工单、生产、质检、销售、出栏"],
-  ["物流", "配送任务、车辆、过磅、签收"],
   ["资金流", "收支账本、成本、利润、生物资产"],
   ["数据流", "报表、大屏、分析模板、质量规则"],
-  ["权限流", "角色视图、菜单范围、只读模式"],
   ["消息流", "消息预警、审批待办、异常提醒"],
-  ["设备流", "设备状态、环境监控、接口管理"]
+  ["权限流", "角色视图、菜单范围、只读模式"]
 ];
 
 const capabilities = [
@@ -44,7 +42,7 @@ export default function PlatformOverview() {
         dark
         eyebrow="平台能力总览"
         title="合力牧业农牧乳一体化经营平台"
-        description="从四大业务板块到七流合一能力，用一个页面向企业负责人说明系统边界、价值和后续上线方向。"
+        description="从四大业务板块到五流合一能力，用一个页面向企业负责人说明系统边界、价值和后续上线方向。"
         action={<Link to="/system-plan" className="rounded-[8px] bg-white px-4 py-3 font-bold text-slate-950">查看建设方案</Link>}
       />
 
@@ -59,8 +57,8 @@ export default function PlatformOverview() {
       </section>
 
       <section className="rounded-[8px] bg-white p-4 shadow-soft ring-1 ring-slate-100">
-        <SectionTitle title="七流合一能力" />
-        <div className="grid gap-3 md:grid-cols-7">
+        <SectionTitle title="五流合一能力" />
+        <div className="grid gap-3 md:grid-cols-5">
           {flows.map(([name, desc]) => (
             <article key={name} className="rounded-[8px] bg-slate-50 p-4">
               <p className="text-xl font-black text-slate-950">{name}</p>
