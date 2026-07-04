@@ -9,6 +9,7 @@ import {
 } from "../services/farmStorage.js";
 import { buildExtendedModules, extendedModuleKeys } from "../data/extendedModules.js";
 import { buildPlatformModules, platformModuleKeys } from "../data/platformModules.js";
+import { buildMobileModules, mobileModuleKeys } from "../data/mobileData.js";
 import { buildAuditLog } from "../services/platformServices.js";
 
 const todayText = new Date().toISOString().slice(0, 10);
@@ -17,15 +18,15 @@ const nowText = () => new Date().toLocaleString("zh-CN", { hour12: false });
 
 export const defaultFarmData = {
   settings: {
-    farmName: "合力牧业农牧乳一体化经营管理平台",
+    farmName: "合力牧业员工端作业系统演示版",
     manager: "场长",
     phone: "13800000000",
     defaultMilkPrice: 4.2,
     defaultDeliveryType: "门店",
     defaultRecorder: "值班员",
     defaultInventoryWarning: 20,
-    currentRole: "集团管理员",
-    currentWorkMode: "经营总览"
+    currentRole: "员工",
+    currentWorkMode: "员工端"
   },
   notices: [
     { id: "notice-1", title: "B 区牛舍下午巡检", content: "请 15:00 前完成 B 区牛舍采食、饮水、通风检查。", author: "场长", createdAt: nowText(), pinned: true, type: "生产提醒", status: "显示" },
@@ -155,7 +156,8 @@ export const defaultFarmData = {
     { id: "dairy-order-2", date: todayText, customer: "社区团购客户", productName: "酸奶", quantity: 900, unitPrice: 5.0, total: 4500, needDelivery: true, syncLedger: false, ledgerId: "", note: "" }
   ],
   ...buildExtendedModules(todayText, monthText),
-  ...buildPlatformModules(todayText, monthText, nowText)
+  ...buildPlatformModules(todayText, monthText, nowText),
+  ...buildMobileModules()
 };
 
 const DemoContext = createContext(null);
@@ -191,6 +193,8 @@ function normalizeData(data) {
     stockInRecords: source.stockInRecords || defaultFarmData.stockInRecords,
     stockOutRecords: source.stockOutRecords || defaultFarmData.stockOutRecords,
     ledgerRecords: (source.ledgerRecords || defaultFarmData.ledgerRecords).map((item) => ({ businessUnit: "集团", ...item })),
+    currentUser: { ...defaultFarmData.currentUser, ...(source.currentUser || {}) },
+    roles: source.roles || defaultFarmData.roles,
     dairyCows: source.dairyCows || defaultFarmData.dairyCows,
     beefCows: source.beefCows || defaultFarmData.beefCows,
     beefBatches: source.beefBatches || defaultFarmData.beefBatches,
@@ -208,7 +212,11 @@ function normalizeData(data) {
     dairyProductInventory: source.dairyProductInventory || defaultFarmData.dairyProductInventory,
     dairySalesOrders: source.dairySalesOrders || defaultFarmData.dairySalesOrders,
     ...Object.fromEntries(extendedModuleKeys.map((key) => [key, source[key] || defaultFarmData[key] || []])),
-    ...Object.fromEntries(platformModuleKeys.map((key) => [key, source[key] || defaultFarmData[key] || []]))
+    ...Object.fromEntries(platformModuleKeys.map((key) => [key, source[key] || defaultFarmData[key] || []])),
+    ...Object.fromEntries(mobileModuleKeys.map((key) => [key, source[key] || defaultFarmData[key] || []])),
+    mobileTasks: (source.mobileTasks || []).some((item) => item.type && item.title) ? source.mobileTasks : defaultFarmData.mobileTasks,
+    workOrders: (source.workOrders || []).some((item) => item.code || item.no) ? source.workOrders : defaultFarmData.workOrders,
+    messages: (source.messages || []).some((item) => item.relatedBusiness || item.receiver) ? source.messages : defaultFarmData.messages
   };
 }
 
@@ -252,6 +260,112 @@ function nextCowStatus(eventType, currentStatus) {
   return map[eventType] || currentStatus;
 }
 
+function nextId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+}
+
+function nextCode(prefix) {
+  return `${prefix}-${Date.now().toString().slice(-6)}`;
+}
+
+function getActor(data) {
+  return data.currentUser || { name: "刘师傅", role: "员工", organizationId: "org-dairy", organizationName: "合力牧业奶牛场" };
+}
+
+function assertWritable(data) {
+  if (getActor(data).role === "只读访客") {
+    throw new Error("当前为只读演示模式，不能执行该操作。");
+  }
+}
+
+function withMobileMeta(current, patch = {}) {
+  const actor = getActor(current);
+  return {
+    id: patch.id || nextId("mobile"),
+    code: patch.code || nextCode("M"),
+    organizationId: patch.organizationId || actor.organizationId,
+    organizationName: patch.organizationName || actor.organizationName,
+    status: patch.status || "已提交",
+    createdAt: patch.createdAt || nowText(),
+    updatedAt: nowText(),
+    createdBy: patch.createdBy || actor.name,
+    remark: patch.remark || "",
+    ...patch
+  };
+}
+
+function createMyRecord(current, { type, title, status = "已提交", relatedId, organizationName, remark = "" }) {
+  const actor = getActor(current);
+  return withMobileMeta(current, {
+    id: nextId("my"),
+    code: nextCode("MY"),
+    type,
+    title,
+    status,
+    relatedId,
+    organizationId: actor.organizationId,
+    organizationName: organizationName || actor.organizationName,
+    createdBy: actor.name,
+    remark
+  });
+}
+
+function createMobileMessage(current, { title, type, content, priority = "普通", relatedBusiness, relatedId, receiver = "管理员", organizationName }) {
+  const actor = getActor(current);
+  return withMobileMeta(current, {
+    id: nextId("msg"),
+    code: nextCode("MSG"),
+    title,
+    type,
+    content,
+    priority,
+    relatedBusiness,
+    relatedId,
+    receiver,
+    businessUnit: organizationName || actor.organizationName,
+    organizationId: actor.organizationId,
+    organizationName: organizationName || actor.organizationName,
+    status: "未读",
+    createdBy: "系统"
+  });
+}
+
+function createMobileWorkOrder(current, { type, title, content, source = "业务提交", handler = "管理员", priority = "重要", relatedBusiness, organizationName }) {
+  const actor = getActor(current);
+  const id = nextId("wo");
+  const createdAt = nowText();
+  return {
+    id,
+    code: nextCode("WO"),
+    no: nextCode("WO"),
+    source,
+    type,
+    title,
+    content,
+    status: "待处理",
+    priority,
+    initiator: actor.name,
+    handler,
+    businessUnit: organizationName || actor.organizationName,
+    organizationId: actor.organizationId,
+    organizationName: organizationName || actor.organizationName,
+    relatedBusiness,
+    createdAt,
+    deadline: `${todayText} 18:00`,
+    plannedAt: `${todayText} 18:00`,
+    processLog: `${createdAt} ${actor.name} 提交，系统自动生成工单`,
+    result: "",
+    reviewer: "",
+    updatedAt: createdAt,
+    createdBy: actor.name,
+    remark: ""
+  };
+}
+
+function finishTask(list = [], relatedId, patch = {}) {
+  return list.map((item) => item.id === relatedId || item.relatedId === relatedId ? { ...item, status: "已完成", updatedAt: nowText(), ...patch } : item);
+}
+
 export function DemoProvider({ children }) {
   const [data, setData] = useState(() => normalizeData(loadFarmData(defaultFarmData)));
 
@@ -270,9 +384,12 @@ export function DemoProvider({ children }) {
     data,
     metrics,
     aiReport,
-    currentRole: data.settings.currentRole || "集团管理员",
-    currentWorkMode: data.settings.currentWorkMode || "经营总览",
-    resetDemo: () => updateData({ ...defaultFarmData, operationLogs: [buildAuditLog({ operator: data.settings.currentRole || "集团管理员", module: "系统设置", action: "重置", objectName: "示例数据", objectId: "demo", summary: "重置为最新平台级示例数据", roleView: data.settings.currentRole || "集团管理员" }), ...(defaultFarmData.operationLogs || [])] }),
+    currentUser: data.currentUser,
+    mobileRole: data.currentUser?.role || "员工",
+    isReadonly: data.currentUser?.role === "只读访客",
+    currentRole: data.settings.currentRole || data.currentUser?.role || "员工",
+    currentWorkMode: data.settings.currentWorkMode || "员工端",
+    resetDemo: () => updateData({ ...defaultFarmData, operationLogs: [buildAuditLog({ operator: data.currentUser?.name || "员工", module: "系统设置", action: "重置", objectName: "示例数据", objectId: "demo", summary: "重置为最新员工端示例数据", roleView: data.currentUser?.role || "员工" }), ...(defaultFarmData.operationLogs || [])] }),
     clearAllData: () => {
       clearFarmData();
       setData(normalizeData(defaultFarmData));
@@ -283,6 +400,173 @@ export function DemoProvider({ children }) {
     updateCollection: (key, nextList) => updateData((current) => withAudit({ ...current, [key]: nextList }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: key, action: "编辑", objectName: key, objectId: key, summary: `更新 ${key} 集合，共 ${nextList.length} 条`, roleView: current.settings.currentRole || "集团管理员" }))),
     setCurrentRole: (role) => updateData((current) => withAudit({ ...current, settings: { ...current.settings, currentRole: role } }, buildAuditLog({ operator: role, module: "角色与组织模拟", action: "状态变更", objectName: "当前角色视图", objectId: role, summary: `切换到 ${role} 视图`, roleView: role }))),
     setCurrentWorkMode: (mode) => updateData((current) => withAudit({ ...current, settings: { ...current.settings, currentWorkMode: mode } }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "工作模式", action: "状态变更", objectName: "当前工作模式", objectId: mode, summary: `切换到 ${mode} 模式`, roleView: current.settings.currentRole || "集团管理员" }))),
+    setMobileRole: (role) => updateData((current) => {
+      const userMap = {
+        员工: { id: "user-employee", name: "刘师傅", role: "员工", organizationId: "org-dairy", organizationName: "合力牧业奶牛场", phone: "13800000001" },
+        管理员: { id: "user-admin", name: "王场长", role: "管理员", organizationId: "org-dairy", organizationName: "合力牧业奶牛场", phone: "13800000009" },
+        只读访客: { id: "user-visitor", name: "演示访客", role: "只读访客", organizationId: "org-dairy", organizationName: "合力牧业奶牛场", phone: "" }
+      };
+      const nextUser = userMap[role] || userMap["员工"];
+      return withAudit({ ...current, currentUser: nextUser, settings: { ...current.settings, currentRole: role, currentWorkMode: "员工端" } }, buildAuditLog({ operator: nextUser.name, module: "个人中心", action: "状态变更", objectName: "当前身份", objectId: role, summary: `切换为${role}身份`, roleView: role }));
+    }),
+    submitFeedingRecord: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const planned = Number(form.plannedAmount || 0);
+      const actual = Number(form.actualAmount || 0);
+      const leftover = Number(form.leftoverAmount || 0);
+      const record = withMobileMeta(current, { ...form, id: nextId("feed-record"), code: nextCode("FR"), actualAmount: actual, plannedAmount: planned, leftoverAmount: leftover, executor: form.executor || actor.name, status: "已完成" });
+      const feedName = String(form.formula || "").includes("育肥") ? "育肥牛饲料" : "奶牛精补料";
+      let inventoryItems = current.inventoryItems || [];
+      if (form.autoDeduct) {
+        inventoryItems = inventoryItems.map((item) => item.name === feedName ? { ...item, stock: Math.max(0, Number(item.stock || 0) - actual), status: Number(item.stock || 0) - actual <= Number(item.safeStock || 0) ? "低库存" : item.status, updatedAt: nowText() } : item);
+      }
+      const abnormal = actual > planned * 1.1 || leftover > planned * 0.15 || ["偏低", "拒食", "异常"].includes(form.intakeStatus);
+      const workOrder = abnormal ? createMobileWorkOrder(current, { type: "饲喂异常", title: `${form.barn || "牛舍"}采食异常`, content: `实际投喂 ${actual} 吨，剩料 ${leftover} 吨，采食情况：${form.intakeStatus || "未填"}`, relatedBusiness: "饲喂记录", organizationName: record.organizationName }) : null;
+      const lowStocks = inventoryItems.filter((item) => Number(item.stock || 0) <= Number(item.safeStock || 0));
+      const messages = [
+        ...(abnormal ? [createMobileMessage(current, { title: "饲喂异常待处理", type: "工单提醒", content: workOrder.content, priority: "重要", relatedBusiness: "工单", relatedId: workOrder.id, organizationName: record.organizationName })] : []),
+        ...lowStocks.map((item) => createMobileMessage(current, { title: `${item.name}库存不足`, type: "库存预警", content: `当前库存 ${item.stock}${item.unit}，低于安全库存 ${item.safeStock}${item.unit}。`, priority: "重要", relatedBusiness: "库存", relatedId: item.id, organizationName: item.organizationName }))
+      ];
+      return withAudit({
+        ...current,
+        feedingRecords: [record, ...(current.feedingRecords || [])],
+        feedingTasks: finishTask(current.feedingTasks, form.taskId),
+        mobileTasks: finishTask(current.mobileTasks, form.taskId),
+        inventoryItems,
+        workOrders: workOrder ? [workOrder, ...(current.workOrders || [])] : current.workOrders,
+        messages: [...messages, ...(current.messages || [])],
+        myRecords: [createMyRecord(current, { type: "饲喂记录", title: `${record.barn} ${record.shift}班饲喂`, status: "已完成", relatedId: record.id, organizationName: record.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "饲喂管理", action: "新增", objectName: "饲喂记录", objectId: record.id, summary: `提交${record.barn}饲喂记录`, roleView: actor.role }));
+    }),
+    submitMilkRecord: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const total = Number(form.totalMilk || form.total || 0);
+      const abnormalMilk = Number(form.abnormalMilk || 0);
+      const record = withMobileMeta(current, { ...form, id: nextId("milk-mobile"), code: nextCode("MR"), total, totalMilk: total, qualifiedMilk: Number(form.qualifiedMilk || 0), abnormalMilk, recorder: form.milker || actor.name, status: abnormalMilk > 0 ? "有异常" : "已完成" });
+      const legacyMilk = { ...record, date: form.date || todayText, barn: form.barn, morning: form.shift === "早班" ? total : 0, evening: form.shift === "晚班" ? total : 0, milkPrice: current.settings.defaultMilkPrice || 4.2, syncIncome: false, ledgerId: "", note: form.remark || "" };
+      const qualityTask = form.sendInspection ? withMobileMeta(current, { id: nextId("quality-task"), code: nextCode("QT"), sampleType: "原奶", relatedBatch: form.tankNo || record.code, sourceOrganization: record.organizationName, sampledAt: nowText(), sender: actor.name, status: "待检", organizationId: "org-plant", organizationName: "欧力菲德乳品厂", createdBy: "系统", remark: "产奶记录自动生成待检任务" }) : null;
+      const delivery = form.generateDelivery ? { id: nextId("del"), taskNo: nextCode("YN"), businessType: "原奶配送", startPoint: "合力牧业奶牛场", endPoint: "欧力菲德乳品厂", goodsName: "原奶", name: "合力牧业奶牛场 -> 欧力菲德乳品厂", type: "原奶配送", amount: total, unit: "吨", status: "待配送", truckId: "", driver: "", createdAt: nowText(), plannedAt: `${todayText} 15:00`, arrivedAt: "", fee: 0, syncExpense: false, ledgerId: "", note: "产奶记录自动生成" } : null;
+      const abnormal = abnormalMilk > total * 0.05 || Number(form.temperature || 0) > 6;
+      const workOrder = abnormal ? createMobileWorkOrder(current, { type: "产奶异常", title: `${form.barn || "牛舍"}异常奶复核`, content: `异常奶 ${abnormalMilk} 吨，原奶温度 ${form.temperature || "-"}℃。`, relatedBusiness: "产奶记录", organizationName: record.organizationName }) : null;
+      return withAudit({
+        ...current,
+        milkRecords: [legacyMilk, ...(current.milkRecords || [])],
+        milkTasks: finishTask(current.milkTasks, form.taskId),
+        mobileTasks: finishTask(current.mobileTasks, form.taskId),
+        qualityTasks: qualityTask ? [qualityTask, ...(current.qualityTasks || [])] : current.qualityTasks,
+        deliveries: delivery ? [delivery, ...(current.deliveries || [])] : current.deliveries,
+        workOrders: workOrder ? [workOrder, ...(current.workOrders || [])] : current.workOrders,
+        messages: [
+          ...(qualityTask ? [createMobileMessage(current, { title: "原奶待质检", type: "质检不合格提醒", content: `${form.barn} ${form.shift}产奶已送检，请质检员处理。`, priority: "重要", relatedBusiness: "质检", relatedId: qualityTask.id, receiver: "质检员", organizationName: "欧力菲德乳品厂" })] : []),
+          ...(workOrder ? [createMobileMessage(current, { title: "异常奶超过阈值", type: "工单提醒", content: workOrder.content, priority: "紧急", relatedBusiness: "工单", relatedId: workOrder.id, organizationName: record.organizationName })] : []),
+          ...(current.messages || [])
+        ],
+        myRecords: [createMyRecord(current, { type: "产奶记录", title: `${form.barn} ${form.shift} ${total}吨`, status: record.status, relatedId: record.id, organizationName: record.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "产奶管理", action: "新增", objectName: "产奶记录", objectId: record.id, summary: `提交${form.shift}产奶 ${total} 吨`, roleView: actor.role }));
+    }),
+    submitBreedingRecord: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const record = withMobileMeta(current, { ...form, id: nextId("breed"), code: form.cattleCode || form.code || nextCode("BR"), recordType: form.recordType || "发情观察", status: "已记录" });
+      const event = withMobileMeta(current, { id: nextId("cattle-event"), code: nextCode("CE"), cattleCode: record.cattleCode, type: record.recordType, eventTime: nowText(), handler: actor.name, method: form.remark || record.recordType, status: "已记录" });
+      const reminder = ["配种记录", "妊检记录"].includes(record.recordType) ? createMobileMessage(current, { title: record.recordType === "配种记录" ? "妊检提醒已生成" : "产犊提醒已生成", type: "繁育提醒", content: `${record.cattleCode} 已记录${record.recordType}，请按计划复查。`, priority: "普通", relatedBusiness: "繁育", relatedId: record.id, organizationName: record.organizationName }) : null;
+      return withAudit({
+        ...current,
+        breedingRecords: [record, ...(current.breedingRecords || [])],
+        cattleEvents: [event, ...(current.cattleEvents || [])],
+        cattleRecords: (current.cattleRecords || []).map((cow) => cow.code === record.cattleCode ? { ...cow, recentBreeding: record.recordType, updatedAt: nowText() } : cow),
+        messages: reminder ? [reminder, ...(current.messages || [])] : current.messages,
+        myRecords: [createMyRecord(current, { type: "繁育记录", title: `${record.cattleCode} ${record.recordType}`, status: "已记录", relatedId: record.id, organizationName: record.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "繁育管理", action: "新增", objectName: record.recordType, objectId: record.id, summary: `提交${record.cattleCode}${record.recordType}`, roleView: actor.role }));
+    }),
+    submitCattleEvent: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const event = withMobileMeta(current, { ...form, id: nextId("cattle-event"), code: nextCode("CE"), cattleCode: form.cattleCode, eventTime: form.eventTime || nowText(), handler: form.handler || actor.name, status: "已记录" });
+      const needsOrder = ["疾病", "用药", "死亡", "异常行为"].includes(form.type);
+      const workOrder = needsOrder ? createMobileWorkOrder(current, { type: "牛只异常", title: `${form.cattleCode} ${form.type}处理`, content: form.method || form.remark || "请现场复核牛只状态。", relatedBusiness: "牛只事件", organizationName: event.organizationName }) : null;
+      return withAudit({
+        ...current,
+        cattleEvents: [event, ...(current.cattleEvents || [])],
+        cattleRecords: (current.cattleRecords || []).map((cow) => cow.code === form.cattleCode ? { ...cow, currentStatus: nextCowStatus(form.type, cow.currentStatus), healthStatus: needsOrder ? "异常" : cow.healthStatus, updatedAt: nowText() } : cow),
+        workOrders: workOrder ? [workOrder, ...(current.workOrders || [])] : current.workOrders,
+        messages: workOrder ? [createMobileMessage(current, { title: "牛只异常工单", type: "工单提醒", content: workOrder.content, priority: "重要", relatedBusiness: "工单", relatedId: workOrder.id, organizationName: event.organizationName }), ...(current.messages || [])] : current.messages,
+        myRecords: [createMyRecord(current, { type: "牛只事件", title: `${form.cattleCode} ${form.type}`, status: "已记录", relatedId: event.id, organizationName: event.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "牛只管理", action: "新增", objectName: "牛只事件", objectId: event.id, summary: `上报${form.cattleCode}${form.type}`, roleView: actor.role }));
+    }),
+    submitInventoryAction: (kind, form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const quantity = Number(form.quantity || 0);
+      const itemName = form.materialName || form.itemName;
+      let inventoryItems = current.inventoryItems || [];
+      let materialRequests = current.materialRequests || [];
+      let inventoryMovements = current.inventoryMovements || [];
+      let messages = current.messages || [];
+      let workOrders = current.workOrders || [];
+      let status = "已提交";
+      let relatedId = "";
+      if (kind === "request") {
+        const request = withMobileMeta(current, { ...form, id: nextId("mr"), code: nextCode("MR"), materialName: itemName, quantity, applicant: form.applicant || actor.name, status: "待审核" });
+        materialRequests = [request, ...materialRequests];
+        const order = createMobileWorkOrder(current, { type: "库存申请", title: `${itemName}领料申请`, content: `${actor.name}申请${itemName}${quantity}${form.unit || ""}，用途：${form.purpose || "-"}`, relatedBusiness: "库存申请", organizationName: request.organizationName });
+        workOrders = [order, ...workOrders];
+        messages = [createMobileMessage(current, { title: "新的领料申请", type: "审批提醒", content: order.content, priority: form.urgent ? "紧急" : "普通", relatedBusiness: "工单", relatedId: order.id, organizationName: request.organizationName }), ...messages];
+        status = "待审核";
+        relatedId = request.id;
+      } else {
+        const movement = withMobileMeta(current, { ...form, id: nextId("move"), code: nextCode(kind === "in" ? "IN" : kind === "out" ? "OUT" : "COUNT"), movementType: kind === "in" ? "入库" : kind === "out" ? "出库" : "盘点", itemName, quantity, handler: form.handler || actor.name, status: "已完成" });
+        inventoryMovements = [movement, ...inventoryMovements];
+        inventoryItems = inventoryItems.map((item) => item.name === itemName ? { ...item, stock: kind === "in" ? Number(item.stock || 0) + quantity : kind === "out" ? Math.max(0, Number(item.stock || 0) - quantity) : Number(form.actualStock || item.stock || 0), status: Number(item.stock || 0) <= Number(item.safeStock || 0) ? "低库存" : "正常", updatedAt: nowText() } : item);
+        relatedId = movement.id;
+      }
+      const lowStocks = inventoryItems.filter((item) => Number(item.stock || 0) <= Number(item.safeStock || 0));
+      messages = [...lowStocks.map((item) => createMobileMessage(current, { title: `${item.name}库存不足`, type: "库存预警", content: `当前库存 ${item.stock}${item.unit}，请及时补货或调拨。`, priority: "重要", relatedBusiness: "库存", relatedId: item.id, organizationName: item.organizationName })), ...messages];
+      return withAudit({ ...current, inventoryItems, inventoryMovements, materialRequests, workOrders, messages, myRecords: [createMyRecord(current, { type: kind === "request" ? "库存申请" : "库存记录", title: `${itemName}${kind === "request" ? "领料申请" : kind === "in" ? "入库" : kind === "out" ? "出库" : "盘点"}`, status, relatedId, organizationName: form.organizationName || actor.organizationName }), ...(current.myRecords || [])] }, buildAuditLog({ operator: actor.name, module: "库存管理", action: "新增", objectName: itemName, objectId: relatedId, summary: `提交库存${kind}记录`, roleView: actor.role }));
+    }),
+    submitQualityInspection: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const passed = form.passed === true || form.passed === "是" || form.result === "合格";
+      const inspection = withMobileMeta(current, { ...form, id: nextId("qi"), code: nextCode("QI"), result: passed ? "合格" : "不合格", status: "已完成", inspector: form.inspector || actor.name });
+      const workOrder = !passed ? createMobileWorkOrder(current, { type: "质检异常", title: `${form.batch || form.relatedBatch}质检不合格`, content: form.handleAdvice || form.reason || "请隔离批次并复核。", relatedBusiness: "质检", organizationName: inspection.organizationName }) : null;
+      return withAudit({
+        ...current,
+        qualityInspections: [inspection, ...(current.qualityInspections || [])],
+        qualityTasks: finishTask(current.qualityTasks, form.taskId, { status: passed ? "合格" : "不合格" }),
+        workOrders: workOrder ? [workOrder, ...(current.workOrders || [])] : current.workOrders,
+        messages: workOrder ? [createMobileMessage(current, { title: "质检不合格", type: "质检不合格提醒", content: workOrder.content, priority: "紧急", relatedBusiness: "工单", relatedId: workOrder.id, organizationName: inspection.organizationName }), ...(current.messages || [])] : current.messages,
+        myRecords: [createMyRecord(current, { type: "质检记录", title: `${inspection.batch || inspection.relatedBatch} ${inspection.result}`, status: inspection.result, relatedId: inspection.id, organizationName: inspection.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "质检管理", action: "新增", objectName: "质检记录", objectId: inspection.id, summary: `提交${inspection.result}质检记录`, roleView: actor.role }));
+    }),
+    submitExceptionReport: (form) => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const report = withMobileMeta(current, { ...form, id: nextId("ex"), code: nextCode("EX"), reporter: form.reporter || actor.name, status: "已生成工单" });
+      const order = createMobileWorkOrder(current, { type: form.exceptionType, title: `${form.exceptionType}处理`, content: form.description, source: "异常上报", priority: form.urgency || "普通", relatedBusiness: "异常上报", organizationName: report.organizationName });
+      return withAudit({
+        ...current,
+        exceptionReports: [report, ...(current.exceptionReports || [])],
+        workOrders: [order, ...(current.workOrders || [])],
+        messages: [createMobileMessage(current, { title: `${form.exceptionType}待处理`, type: "工单提醒", content: form.description, priority: form.urgency || "普通", relatedBusiness: "工单", relatedId: order.id, organizationName: report.organizationName }), ...(current.messages || [])],
+        myRecords: [createMyRecord(current, { type: "异常上报", title: form.exceptionType, status: "已生成工单", relatedId: report.id, organizationName: report.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "异常上报", action: "新增", objectName: form.exceptionType, objectId: report.id, summary: `提交${form.exceptionType}异常并生成工单`, roleView: actor.role }));
+    }),
+    updateMobileWorkOrder: (id, status, result = "") => updateData((current) => {
+      assertWritable(current);
+      const actor = getActor(current);
+      const target = (current.workOrders || []).find((item) => item.id === id);
+      const workOrders = (current.workOrders || []).map((item) => item.id === id ? { ...item, status, result: result || item.result, handler: item.handler || actor.name, updatedAt: nowText(), processLog: `${item.processLog || ""}\n${nowText()} ${actor.name} 将状态改为${status}` } : item);
+      return withAudit({
+        ...current,
+        workOrders,
+        messages: [createMobileMessage(current, { title: `工单${status}`, type: "工单提醒", content: `${target?.title || "工单"}状态已变更为${status}`, priority: status === "已驳回" ? "重要" : "普通", relatedBusiness: "工单", relatedId: id, receiver: target?.initiator || actor.name, organizationName: target?.organizationName || actor.organizationName }), ...(current.messages || [])],
+        myRecords: [createMyRecord(current, { type: "工单处理", title: target?.title || "工单处理", status, relatedId: id, organizationName: target?.organizationName || actor.organizationName }), ...(current.myRecords || [])]
+      }, buildAuditLog({ operator: actor.name, module: "工单处理", action: "状态变更", objectName: target?.title || "工单", objectId: id, summary: `工单状态变更为${status}`, roleView: actor.role, note: result }));
+    }),
+    markMobileMessageRead: (id) => updateData((current) => ({ ...current, messages: (current.messages || []).map((item) => item.id === id ? { ...item, status: "已读", updatedAt: nowText() } : item) })),
     markAllMessagesRead: () => updateData((current) => withAudit({ ...current, messages: current.messages.map((item) => item.status === "未读" ? { ...item, status: "已读" } : item) }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "消息中心", action: "状态变更", objectName: "全部未读消息", objectId: "messages", summary: "一键标记所有未读消息为已读", roleView: current.settings.currentRole || "集团管理员" }))),
     updateMessageStatus: (id, status, handleNote = "") => updateData((current) => withAudit({ ...current, messages: current.messages.map((item) => item.id === id ? { ...item, status, handledAt: ["已处理", "已忽略"].includes(status) ? nowText() : item.handledAt, handleNote: handleNote || item.handleNote } : item) }, buildAuditLog({ operator: current.settings.currentRole || "集团管理员", module: "消息中心", action: "状态变更", objectName: "消息", objectId: id, summary: `消息状态变更为 ${status}`, roleView: current.settings.currentRole || "集团管理员" }))),
     upsertApproval: (approval) => updateData((current) => {

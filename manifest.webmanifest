@@ -1,7 +1,7 @@
 {
-  "name": "合力牧业农牧乳一体化经营管理平台",
-  "short_name": "合力牧业农牧乳",
-  "description": "覆盖奶牛场、肉牛场、饲料厂、乳品厂的农牧乳一体化前端演示平台",
+  "name": "合力牧业员工端作业系统",
+  "short_name": "合力员工端",
+  "description": "面向牧场员工的移动端作业、填报、工单和消息演示系统",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6fbf8",
