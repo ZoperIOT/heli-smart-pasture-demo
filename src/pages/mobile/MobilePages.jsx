@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, BookOpen, Boxes, ClipboardList, FileText, HeartHandshake, HeartPulse, Milk, PackageCheck, Search, Wheat } from "lucide-react";
+import { AlertTriangle, Bell, BookOpen, Boxes, CheckCircle2, ClipboardList, Database, FileCheck2, FileText, HeartHandshake, HeartPulse, Milk, PackageCheck, Search, Send, UserRound, UsersRound, Wheat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDemo } from "../../context/DemoContext.jsx";
 import {
-  AdminBadge,
   Field,
   GuardButton,
   DraftBox,
@@ -67,14 +66,22 @@ function calcMilk(form) {
   };
 }
 
-function QuickLink({ to, icon: Icon, title, desc }) {
+function QuickLink({ to, icon: Icon, title, desc, tone = "emerald" }) {
+  const tones = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    sky: "bg-sky-50 text-sky-700",
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+    violet: "bg-violet-50 text-violet-700",
+    slate: "bg-slate-100 text-slate-700"
+  };
   return (
-    <Link to={to} className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-      <span className="grid h-11 w-11 place-items-center rounded-[8px] bg-emerald-50 text-emerald-700">
-        <Icon size={23} />
+    <Link to={to} className="min-h-36 rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100 active:scale-[0.99]">
+      <span className={`grid h-14 w-14 place-items-center rounded-[8px] ${tones[tone] || tones.emerald}`}>
+        <Icon size={29} />
       </span>
       <p className="mt-3 text-lg font-black text-slate-950">{title}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>
+      <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{desc}</p>
     </Link>
   );
 }
@@ -88,82 +95,110 @@ function visibleForUser(list, demo, ownerKeys = ["assignee", "owner", "handler",
 export function MobileHomePage() {
   const demo = useDemo();
   const data = demo.data;
+  const user = demo.currentUser || {};
   const tasks = visibleForUser(data.mobileTasks, demo);
-  const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => !["已完成", "已驳回"].includes(item.status));
-  const workOrders = visibleForUser(data.workOrders, demo).filter((item) => !["已完成", "已驳回"].includes(item.status));
+  const openStatuses = ["待派发", "待处理", "处理中", "待复核", "已驳回", "已超时", "未开始", "进行中"];
+  const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => openStatuses.includes(item.status));
+  const workOrders = visibleForUser(data.workOrders, demo).filter((item) => openStatuses.includes(item.status));
   const messages = visibleForUser(data.messages, demo, ["receiver", "createdBy"]).slice(0, 3);
-  const myRecords = demo.mobileRole === "管理员" ? (data.myRecords || []).slice(0, 4) : (data.myRecords || []).filter((item) => item.createdBy === demo.currentUser?.name).slice(0, 4);
-  const urgent = [...tasks, ...smartOrders, ...workOrders, ...(data.messages || [])].filter((item) => ["紧急", "重要"].includes(item.priority) || item.urgency === "紧急").length;
-  const doneToday = (data.myRecords || []).filter((item) => String(item.createdAt || "").startsWith(today())).length;
-  const pendingApprovals = (data.materialRequests || []).filter((item) => item.status === "待审核").length;
-  const qualityFails = (data.qualityInspections || []).filter((item) => item.result === "不合格").length;
-  const feedingDeviation = (data.feedingRecords || []).filter((item) => Math.abs(Number(item.deviationRate || 0)) > 10).length;
+  const myRecords = demo.mobileRole === "管理员" ? (data.myRecords || []).slice(0, 3) : (data.myRecords || []).filter((item) => item.createdBy === demo.currentUser?.name).slice(0, 3);
+  const urgentOrders = [...smartOrders, ...workOrders].filter((item) => item.priority === "紧急");
+  const importantOrders = [...smartOrders, ...workOrders]
+    .sort((a, b) => {
+      const score = (item) => item.priority === "紧急" ? 3 : item.priority === "重要" ? 2 : 1;
+      return score(b) - score(a);
+    })
+    .slice(0, 3);
+  const doneToday = (data.myRecords || []).filter((item) => String(item.createdAt || "").startsWith(today()) && (demo.mobileRole === "管理员" || item.createdBy === user.name)).length;
+  const abnormalCount = [
+    ...(data.exceptionReports || []),
+    ...workOrders.filter((item) => item.source === "exception" || item.source === "quality" || String(item.type || "").includes("异常"))
+  ].filter((item) => demo.mobileRole === "管理员" || item.handler === user.name || item.createdBy === user.name || item.reporter === user.name).length;
+  const actionItems = [
+    { to: "/feeding", icon: Wheat, title: "饲喂记录", desc: "填写投喂量、剩料、采食情况", tone: "emerald" },
+    { to: "/milk", icon: Milk, title: "产奶记录", desc: "录入班次产奶量和异常奶", tone: "sky" },
+    { to: "/breeding", icon: HeartPulse, title: "繁育记录", desc: "记录发情、配种、妊检、产犊", tone: "rose" },
+    { to: "/cattle", icon: Search, title: "牛只管理", desc: "查牛号、转群、上报牛只异常", tone: "amber" },
+    { to: "/inventory", icon: Boxes, title: "库存申请", desc: "领料、入库、出库、盘点", tone: "violet" },
+    { to: "/quality", icon: PackageCheck, title: "质检记录", desc: "原奶、饲料、成品质检", tone: "emerald" },
+    { to: "/reports", icon: AlertTriangle, title: "异常上报", desc: "上报牛只、饲喂、库存异常", tone: "rose" },
+    { to: "/handover", icon: HeartHandshake, title: "交接班", desc: "提交未完成事项和重点观察", tone: "sky" }
+  ];
+  const adminItems = [
+    { to: "/work-orders", icon: Send, title: "工单派发", desc: "创建并分配员工工单", tone: "emerald" },
+    { to: "/work-orders", icon: FileCheck2, title: "工单审核", desc: "复核员工提交结果", tone: "amber" },
+    { to: "/records", icon: UsersRound, title: "员工记录", desc: "查看全部员工提交", tone: "sky" },
+    { to: "/profile", icon: Database, title: "基础数据", desc: "维护牛舍、物料、员工资料", tone: "slate" }
+  ];
+  const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
 
   return (
-    <div>
-      <PageTitle title={demo.mobileRole === "管理员" ? "管理员工作台" : "今日工作台"} desc="先看待办，再处理工单，现场业务随手提交。" action={<AdminBadge />} />
-      <ReadOnlyNotice />
-      <div className="mb-4 grid grid-cols-2 gap-3">
-        <MiniStat label="今日待办" value={tasks.filter((item) => item.status !== "已完成").length + smartOrders.length} />
-        <MiniStat label="紧急任务" value={urgent} tone="red" />
-        <MiniStat label="待处理工单" value={smartOrders.length + workOrders.length} tone="amber" />
-        <MiniStat label="今日已提交" value={doneToday} />
-      </div>
-      {demo.mobileRole === "管理员" && (
-        <SectionCard title="管理员提醒">
-          <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="待审核" value={pendingApprovals} tone="amber" />
-            <MiniStat label="异常工单" value={workOrders.filter((item) => item.status !== "已完成").length} tone="red" />
-            <MiniStat label="饲喂偏差" value={feedingDeviation} tone="amber" />
-            <MiniStat label="质检不合格" value={qualityFails} tone="red" />
+    <div className="space-y-4">
+      <section className="rounded-[8px] bg-emerald-800 p-4 text-white shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-[8px] bg-white/12">
+            <UserRound size={25} />
           </div>
-        </SectionCard>
-      )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xl font-black">合力牧业员工工作台</p>
+            <p className="mt-1 truncate text-sm font-bold text-emerald-50">{user.name || "刘师傅"} · {user.role || "员工"} · {user.organizationName || "合力牧业奶牛场"}</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-100">{todayLabel}</p>
+          </div>
+          <Link to="/messages" className="relative grid h-11 w-11 place-items-center rounded-[8px] bg-white/12">
+            <Bell size={22} />
+            {messages.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-black">{messages.length}</span>}
+          </Link>
+        </div>
+      </section>
+      <ReadOnlyNotice />
 
-      <SectionCard title="今日智能工单" desc="按紧急程度和截止时间优先处理">
-        <div className="space-y-3">
-          {smartOrders.slice(0, 5).map((order) => <SmartWorkOrderCard key={order.id} order={order} onStatus={(status) => demo.updateMobileWorkOrder(order.id, status)} />)}
-          {!smartOrders.length && <EmptyState title="今日智能工单已清空" desc="新的异常、质检和库存提醒会自动生成工单。" />}
+      <section className="grid grid-cols-2 gap-3">
+        <MiniStat label="今日待办" value={tasks.filter((item) => item.status !== "已完成").length + smartOrders.length + workOrders.length} />
+        <MiniStat label="紧急工单" value={urgentOrders.length} tone="red" />
+        <MiniStat label="已完成" value={doneToday} />
+        <MiniStat label="待处理异常" value={abnormalCount} tone="amber" />
+      </section>
+
+      <SectionCard title="今日重点工单" desc="先处理最急的 2-3 件事">
+        <div className="space-y-2">
+          {importantOrders.map((order) => (
+            <Link key={order.id} to="/work-orders" className="block rounded-[8px] bg-slate-50 p-3 active:scale-[0.99]">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-black text-slate-950">{order.title}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-500">{order.type} · 截止 {order.deadline || order.plannedAt || "-"}</p>
+                </div>
+                <StatusTag status={order.priority || "普通"} />
+              </div>
+            </Link>
+          ))}
+          {!importantOrders.length && <EmptyState title="今日暂无重点工单" desc="有新任务时会显示在这里。" />}
         </div>
       </SectionCard>
 
-      <SectionCard title="快捷操作">
+      <SectionCard title="快捷操作" desc="常用业务一键进入">
         <QuickActionGrid>
-          <QuickLink to="/feeding" icon={Wheat} title="饲喂记录" desc="投料、剩料、采食" />
-          <QuickLink to="/milk" icon={Milk} title="产奶记录" desc="班次、奶量、送检" />
-          <QuickLink to="/breeding" icon={HeartPulse} title="繁育记录" desc="发情、配种、妊检" />
-          <QuickLink to="/cattle" icon={Search} title="牛只事件" desc="查牛、转群、用药" />
-          <QuickLink to="/inventory" icon={Boxes} title="库存申请" desc="领料、入库、盘点" />
-          <QuickLink to="/quality" icon={PackageCheck} title="质检记录" desc="原奶、饲料、成品" />
-          <QuickLink to="/reports" icon={AlertTriangle} title="异常上报" desc="异常自动成工单" />
-          <QuickLink to="/handover" icon={HeartHandshake} title="交接班" desc="未完成和异常交接" />
-          <QuickLink to="/manuals" icon={BookOpen} title="操作手册" desc="现场规范快速看" />
-          <QuickLink to="/records" icon={FileText} title="我的记录" desc="我提交和处理的事" />
+          {[...actionItems, ...(demo.mobileRole === "管理员" ? adminItems : [])].map((item) => <QuickLink key={item.title} {...item} />)}
         </QuickActionGrid>
       </SectionCard>
 
-      <SectionCard title={demo.mobileRole === "管理员" ? "今日任务" : "我的待办"}>
-        <div className="space-y-3">
-          {tasks.slice(0, 3).map((task) => <TaskCard key={task.id} task={task} />)}
-          {!tasks.length && <p className="text-base font-bold text-slate-500">今天暂无待办。</p>}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="待处理工单">
-        <div className="space-y-3">
-          {workOrders.slice(0, 2).map((order) => <WorkOrderCard key={order.id} order={order} />)}
-          {!workOrders.length && <p className="text-base font-bold text-slate-500">暂无待处理工单。</p>}
-        </div>
-      </SectionCard>
-
       <SectionCard title="最近消息">
-        <div className="space-y-3">
-          {messages.map((message) => <MessageCard key={message.id} message={message} onRead={() => demo.markMobileMessageRead(message.id)} />)}
-          {!messages.length && <p className="text-base font-bold text-slate-500">暂无新消息。</p>}
+        <div className="space-y-2">
+          {messages.map((message) => (
+            <Link key={message.id} to={String(message.relatedBusiness || "").includes("工单") ? "/work-orders" : "/messages"} onClick={() => demo.markMobileMessageRead(message.id)} className="flex items-start gap-3 rounded-[8px] bg-slate-50 p-3 active:scale-[0.99]">
+              <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-sky-50 text-sky-700"><Bell size={20} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-black">{message.title}</p>
+                <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-500">{message.content}</p>
+              </div>
+              <StatusTag status={message.priority || "普通"} />
+            </Link>
+          ))}
+          {!messages.length && <EmptyState title="暂无新消息" desc="任务提醒和工单变化会显示在这里。" />}
         </div>
       </SectionCard>
 
-      <SectionCard title={demo.mobileRole === "管理员" ? "员工提交记录" : "我的提交记录"}>
+      <SectionCard title={demo.mobileRole === "管理员" ? "最近员工记录" : "最近记录"}>
         <div className="space-y-2">
           {myRecords.map((item) => (
             <Link key={item.id} to="/records" className="flex items-center gap-3 rounded-[8px] bg-slate-50 p-3">
@@ -174,6 +209,7 @@ export function MobileHomePage() {
               <StatusTag status={item.status} />
             </Link>
           ))}
+          {!myRecords.length && <EmptyState title="暂无提交记录" desc="完成业务提交后会显示最近记录。" />}
         </div>
       </SectionCard>
     </div>

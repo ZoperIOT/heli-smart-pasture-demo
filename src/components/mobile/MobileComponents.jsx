@@ -70,12 +70,13 @@ export function BottomTabBar() {
     { to: "/app", label: "首页", icon: Home },
     { to: "/work-orders", label: "工单", icon: ClipboardList },
     { to: "/messages", label: "消息", icon: MessageCircle },
+    { to: "/records", label: "记录", icon: FileText },
     { to: "/profile", label: "我的", icon: UserRound }
   ];
   const location = useLocation();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1">
+      <div className="mx-auto grid max-w-[520px] grid-cols-5 gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = location.pathname === tab.to || (tab.to === "/app" && location.pathname === "/");
