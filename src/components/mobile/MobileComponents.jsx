@@ -68,7 +68,7 @@ export function MobileTopBar() {
 export function BottomTabBar() {
   const tabs = [
     { to: "/app", label: "首页", icon: Home },
-    { to: "/tasks", label: "工单", icon: ClipboardList },
+    { to: "/work-orders", label: "工单", icon: ClipboardList },
     { to: "/messages", label: "消息", icon: MessageCircle },
     { to: "/profile", label: "我的", icon: UserRound }
   ];
