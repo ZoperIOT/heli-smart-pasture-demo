@@ -180,7 +180,16 @@ export function MessageCard({ message, onRead }) {
   );
 }
 
-export function WorkOrderCard({ order, onStatus }) {
+const sourceLabels = {
+  manual: "管理员派发",
+  exception: "异常上报",
+  system: "系统规则",
+  quality: "质检异常",
+  inventory: "库存预警",
+  breeding: "繁育提醒"
+};
+
+export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onApprove, onReject, onCancel, canSubmit, canReview, canCancel }) {
   return (
     <div className="rounded-[8px] border border-slate-100 bg-white p-4">
       <div className="flex items-start gap-3">
@@ -191,7 +200,35 @@ export function WorkOrderCard({ order, onStatus }) {
         <StatusTag status={order.status} />
       </div>
       <p className="mt-3 text-base font-semibold leading-6 text-slate-700">{order.content}</p>
-      <p className="mt-2 text-sm font-bold text-slate-500">处理人：{order.handler || order.owner || "未分配"} · 截止：{order.deadline || order.plannedAt || "-"}</p>
+      <div className="mt-3 grid gap-1 rounded-[8px] bg-slate-50 p-3 text-sm font-bold text-slate-600">
+        <p>来源：{sourceLabels[order.source] || order.source || "系统规则"} · 优先级：{order.priority || "普通"}</p>
+        <p>处理人：{order.handler || order.owner || "未分配"} · 截止：{order.deadline || order.plannedAt || "-"}</p>
+        <p>关联：{order.relatedObject || order.relatedBusiness || "-"}</p>
+        {order.operationRequirement && <p>要求：{order.operationRequirement}</p>}
+        {(order.requirePhoto || order.requireReview) && <p>要求：{order.requirePhoto ? "需照片" : ""}{order.requirePhoto && order.requireReview ? "，" : ""}{order.requireReview ? "需复核" : ""}</p>}
+      </div>
+      {order.result && (
+        <div className="mt-3 rounded-[8px] bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+          <p className="font-black">处理结果</p>
+          <p className="mt-1">{order.result}</p>
+          {order.resultSubmittedAt && <p className="mt-1 text-emerald-700">完成时间：{order.resultSubmittedAt}</p>}
+          {order.resultException && <p className="mt-1 text-amber-700">异常说明：{order.resultException}</p>}
+          {order.reviewOpinion && <p className="mt-1 text-red-700">复核意见：{order.reviewOpinion}</p>}
+        </div>
+      )}
+      {canSubmit && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={onStart} className="min-h-11 rounded-[8px] bg-emerald-700 text-sm font-black text-white">开始处理</button>
+          <button onClick={onSubmitResult} className="min-h-11 rounded-[8px] bg-sky-50 text-sm font-black text-sky-700">提交结果</button>
+        </div>
+      )}
+      {canReview && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={onApprove} className="min-h-11 rounded-[8px] bg-emerald-700 text-sm font-black text-white">复核通过</button>
+          <button onClick={onReject} className="min-h-11 rounded-[8px] bg-red-50 text-sm font-black text-red-700">驳回</button>
+        </div>
+      )}
+      {canCancel && <button onClick={onCancel} className="mt-2 min-h-11 w-full rounded-[8px] bg-slate-100 text-sm font-black text-slate-700">取消工单</button>}
       {onStatus && (
         <div className="mt-3 grid grid-cols-3 gap-2">
           {["处理中", "待复核", "已完成"].map((status) => (

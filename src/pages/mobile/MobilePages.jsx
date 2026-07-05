@@ -651,14 +651,171 @@ export function ManualsPage() {
 
 export function WorkOrdersPage() {
   const demo = useDemo();
-  const orders = visibleForUser(demo.data.workOrders, demo).filter((item) => demo.mobileRole === "管理员" || item.handler === demo.currentUser?.name || item.createdBy === demo.currentUser?.name || item.initiator === demo.currentUser?.name);
+  const employeeNames = Array.from(new Set(["刘师傅", "赵师傅", "周师傅", ...(demo.data.employeeStats || []).map((item) => item.employee).filter(Boolean)]));
+  const organizations = (demo.data.organizations || []).map((item) => item.name);
+  const [showDispatch, setShowDispatch] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [filters, setFilters] = useState({ employee: "全部", status: "全部", type: "全部", priority: "全部" });
+  const [dispatchForm, setDispatchForm] = useState({
+    title: "A区泌乳牛舍采食复核",
+    type: "牛只观察工单",
+    organizationName: organizations[0] || "合力牧业奶牛场",
+    relatedObjectType: "牛舍",
+    relatedObject: "A区泌乳牛舍",
+    handler: employeeNames[0] || "刘师傅",
+    priority: "重要",
+    deadline: `${today()} 18:00`,
+    content: "现场复核采食、饮水和剩料情况，异常及时备注。",
+    operationRequirement: "填写处理结果，必要时上传现场照片占位。",
+    requirePhoto: true,
+    requireReview: true,
+    remark: ""
+  });
+  const [resultForm, setResultForm] = useState({ result: "已完成现场处理，未发现新增异常。", finishedAt: nowTime(), photo: "现场照片上传占位", exceptionNote: "", remark: "" });
+  const sourceText = { manual: "管理员派发", exception: "异常上报", system: "系统规则", quality: "质检异常", inventory: "库存预警", breeding: "繁育提醒" };
+  const allOrders = demo.mobileRole === "只读访客"
+    ? (demo.data.workOrders || [])
+    : demo.mobileRole === "管理员"
+      ? (demo.data.workOrders || [])
+      : (demo.data.workOrders || []).filter((item) => item.handler === demo.currentUser?.name || item.createdBy === demo.currentUser?.name || item.initiator === demo.currentUser?.name);
+  const filteredOrders = allOrders.filter((item) =>
+    (filters.employee === "全部" || item.handler === filters.employee) &&
+    (filters.status === "全部" || item.status === filters.status) &&
+    (filters.type === "全部" || item.type === filters.type) &&
+    (filters.priority === "全部" || item.priority === filters.priority)
+  );
+  const isOverdue = (item) => !["已完成", "已取消"].includes(item.status) && item.deadline && new Date(String(item.deadline).replace(/-/g, "/")).getTime() < Date.now();
+  const manualToday = (demo.data.workOrders || []).filter((item) => item.source === "manual" && String(item.createdAt || "").startsWith(today())).length;
+  const pending = filteredOrders.filter((item) => ["待派发", "待处理", "处理中", "已驳回"].includes(item.status));
+  const review = filteredOrders.filter((item) => item.status === "待复核");
+  const abnormal = filteredOrders.filter((item) => item.source === "exception" || item.source === "quality" || item.source === "inventory" || String(item.type || "").includes("异常"));
+  const done = filteredOrders.filter((item) => item.status === "已完成");
+  const urgent = filteredOrders.filter((item) => item.priority === "紧急");
+  const overdue = filteredOrders.filter((item) => item.status === "已超时" || isOverdue(item));
+  const completionRate = filteredOrders.length ? Math.round((done.length / filteredOrders.length) * 100) : 0;
+  const submitDispatch = useSubmit(() => {
+    demo.dispatchWorkOrder(dispatchForm);
+    setShowDispatch(false);
+  });
+  const submitResult = useSubmit(() => {
+    if (!selectedOrder) return;
+    demo.submitWorkOrderResult(selectedOrder.id, resultForm);
+    setSelectedOrder(null);
+    setResultForm({ result: "已完成现场处理，未发现新增异常。", finishedAt: nowTime(), photo: "现场照片上传占位", exceptionNote: "", remark: "" });
+  });
+  const readonlyAlert = () => window.alert("当前为只读演示模式，不能执行该操作。");
+  const startOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "处理中");
+  const cancelOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "已取消");
+  const approveOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.reviewWorkOrder(order.id, "approve");
+  const rejectOrder = (order) => {
+    if (demo.isReadonly) return readonlyAlert();
+    const reason = window.prompt("请输入驳回原因", "处理结果不完整，请补充现场说明。") || "请重新处理";
+    demo.reviewWorkOrder(order.id, "reject", reason);
+  };
+  const renderOrderList = (list, emptyText, options = {}) => (
+    <div className="space-y-3">
+      {list.map((order) => (
+        <WorkOrderCard
+          key={order.id}
+          order={{ ...order, source: sourceText[order.source] ? order.source : order.source }}
+          canSubmit={options.employeeActions && ["待处理", "处理中", "已驳回"].includes(order.status)}
+          canReview={options.adminReview && order.status === "待复核"}
+          canCancel={options.adminCancel && !["已完成", "已取消"].includes(order.status)}
+          onStart={() => startOrder(order)}
+          onSubmitResult={() => setSelectedOrder(order)}
+          onApprove={() => approveOrder(order)}
+          onReject={() => rejectOrder(order)}
+          onCancel={() => cancelOrder(order)}
+        />
+      ))}
+      {!list.length && <EmptyState title={emptyText} desc="暂无符合条件的工单。" />}
+    </div>
+  );
+
   return (
     <div>
-      <PageTitle title="工单处理" desc={demo.mobileRole === "管理员" ? "查看和处理全部工单。" : "查看和处理分配给我的工单。"} />
+      <PageTitle
+        title={demo.mobileRole === "管理员" ? "管理员工单" : "工单处理"}
+        desc={demo.mobileRole === "管理员" ? "派发、跟进、复核和统计全部工单。" : "查看和处理分配给我的工单。"}
+        action={demo.mobileRole === "管理员" ? <button onClick={() => setShowDispatch((value) => !value)} className="min-h-11 rounded-[8px] bg-emerald-700 px-4 text-base font-black text-white">派发工单</button> : null}
+      />
       <ReadOnlyNotice />
-      <div className="space-y-3">
-        {orders.map((order) => <WorkOrderCard key={order.id} order={order} onStatus={(status) => demo.isReadonly ? window.alert("当前为只读演示模式，不能执行该操作。") : demo.updateMobileWorkOrder(order.id, status)} />)}
-      </div>
+      {demo.mobileRole === "管理员" && (
+        <>
+          <SectionCard title="工单看板">
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat label="今日派发" value={manualToday} />
+              <MiniStat label="待处理" value={pending.length} tone="amber" />
+              <MiniStat label="待复核" value={review.length} tone="blue" />
+              <MiniStat label="紧急工单" value={urgent.length} tone="red" />
+            </div>
+          </SectionCard>
+
+          {showDispatch && (
+            <SectionCard title="工单派发" desc="管理员创建工单后，员工会收到消息并在本人工单页看到任务。">
+              <div className="grid gap-3">
+                <Field label="工单标题"><TextInput value={dispatchForm.title} onChange={(e) => setDispatchForm({ ...dispatchForm, title: e.target.value })} /></Field>
+                <Field label="工单类型"><SelectInput value={dispatchForm.type} onChange={(e) => setDispatchForm({ ...dispatchForm, type: e.target.value })}>{["饲喂工单", "产奶工单", "繁育工单", "牛只观察工单", "牛只异常处理工单", "库存盘点工单", "领料处理工单", "入库工单", "出库工单", "质检工单", "交接班工单", "其他工单"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+                <Field label="所属组织"><SelectInput value={dispatchForm.organizationName} onChange={(e) => setDispatchForm({ ...dispatchForm, organizationName: e.target.value })}>{organizations.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="关联对象"><SelectInput value={dispatchForm.relatedObjectType} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObjectType: e.target.value })}>{["牛舍", "牛群", "牛号", "物料", "批次", "质检样品", "库存物料", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+                  <Field label="对象名称"><TextInput value={dispatchForm.relatedObject} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObject: e.target.value })} /></Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="派发给"><SelectInput value={dispatchForm.handler} onChange={(e) => setDispatchForm({ ...dispatchForm, handler: e.target.value })}>{employeeNames.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+                  <Field label="优先级"><SelectInput value={dispatchForm.priority} onChange={(e) => setDispatchForm({ ...dispatchForm, priority: e.target.value })}>{["普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+                </div>
+                <Field label="截止时间"><TextInput value={dispatchForm.deadline} onChange={(e) => setDispatchForm({ ...dispatchForm, deadline: e.target.value })} /></Field>
+                <Field label="工单说明"><TextArea value={dispatchForm.content} onChange={(e) => setDispatchForm({ ...dispatchForm, content: e.target.value })} /></Field>
+                <Field label="操作要求"><TextArea value={dispatchForm.operationRequirement} onChange={(e) => setDispatchForm({ ...dispatchForm, operationRequirement: e.target.value })} /></Field>
+                <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requirePhoto} onChange={(e) => setDispatchForm({ ...dispatchForm, requirePhoto: e.target.checked })} />需要员工上传照片</label>
+                <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requireReview} onChange={(e) => setDispatchForm({ ...dispatchForm, requireReview: e.target.checked })} />需要管理员复核</label>
+                <Field label="备注"><TextArea value={dispatchForm.remark} onChange={(e) => setDispatchForm({ ...dispatchForm, remark: e.target.value })} /></Field>
+                <SubmitBar disabled={demo.isReadonly} onClick={submitDispatch}>确认派发工单</SubmitBar>
+              </div>
+            </SectionCard>
+          )}
+
+          <SectionCard title="筛选">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="员工"><SelectInput value={filters.employee} onChange={(e) => setFilters({ ...filters, employee: e.target.value })}>{["全部", ...employeeNames].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+              <Field label="状态"><SelectInput value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>{["全部", "待派发", "待处理", "处理中", "待复核", "已完成", "已驳回", "已取消", "已超时"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+              <Field label="类型"><SelectInput value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>{["全部", ...Array.from(new Set((demo.data.workOrders || []).map((item) => item.type))).filter(Boolean)].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+              <Field label="优先级"><SelectInput value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value })}>{["全部", "普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            </div>
+          </SectionCard>
+          <SectionCard title="待处理工单">{renderOrderList(pending, "暂无待处理工单", { adminCancel: true })}</SectionCard>
+          <SectionCard title="待复核工单">{renderOrderList(review, "暂无待复核工单", { adminReview: true, adminCancel: true })}</SectionCard>
+          <SectionCard title="异常工单">{renderOrderList(abnormal, "暂无异常工单", { adminReview: true, adminCancel: true })}</SectionCard>
+          <SectionCard title="已完成工单">{renderOrderList(done, "暂无已完成工单")}</SectionCard>
+          <SectionCard title="工单统计">
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat label="已完成" value={done.length} />
+              <MiniStat label="已超时" value={overdue.length} tone="red" />
+              <MiniStat label="员工完成率" value={`${completionRate}%`} />
+              <MiniStat label="全部工单" value={filteredOrders.length} tone="blue" />
+            </div>
+          </SectionCard>
+        </>
+      )}
+
+      {demo.mobileRole !== "管理员" && (
+        <>
+          {selectedOrder && (
+            <SectionCard title="提交处理结果" desc={selectedOrder.title}>
+              <div className="grid gap-3">
+                <Field label="处理结果"><TextArea value={resultForm.result} onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })} /></Field>
+                <Field label="完成时间"><TextInput value={resultForm.finishedAt} onChange={(e) => setResultForm({ ...resultForm, finishedAt: e.target.value })} /></Field>
+                <Field label="现场照片"><TextInput value={resultForm.photo} onChange={(e) => setResultForm({ ...resultForm, photo: e.target.value })} /></Field>
+                <Field label="异常说明"><TextArea value={resultForm.exceptionNote} onChange={(e) => setResultForm({ ...resultForm, exceptionNote: e.target.value })} /></Field>
+                <Field label="备注"><TextArea value={resultForm.remark} onChange={(e) => setResultForm({ ...resultForm, remark: e.target.value })} /></Field>
+                <SubmitBar disabled={demo.isReadonly} onClick={submitResult}>提交处理结果</SubmitBar>
+              </div>
+            </SectionCard>
+          )}
+          {renderOrderList(filteredOrders, "暂无我的工单", { employeeActions: !demo.isReadonly })}
+        </>
+      )}
     </div>
   );
 }
