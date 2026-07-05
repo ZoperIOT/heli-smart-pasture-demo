@@ -872,10 +872,12 @@ export function ManualsPage() {
 
 export function WorkOrdersPage() {
   const demo = useDemo();
+  const user = demo.currentUser || {};
   const employeeNames = Array.from(new Set(["刘师傅", "赵师傅", "周师傅", ...(demo.data.employeeStats || []).map((item) => item.employee).filter(Boolean)]));
   const organizations = (demo.data.organizations || []).map((item) => item.name);
   const [showDispatch, setShowDispatch] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [activeOrderForm, setActiveOrderForm] = useState(null);
   const [filters, setFilters] = useState({ employee: "全部", status: "全部", type: "全部", priority: "全部" });
   const [dispatchForm, setDispatchForm] = useState({
     title: "A区泌乳牛舍采食复核",
@@ -893,6 +895,7 @@ export function WorkOrdersPage() {
     remark: ""
   });
   const [resultForm, setResultForm] = useState({ result: "已完成现场处理，未发现新增异常。", finishedAt: nowTime(), photo: "现场照片上传占位", exceptionNote: "", remark: "" });
+  const [orderFeedingForm, setOrderFeedingForm] = useState({ date: today(), shift: "早", barn: "A区泌乳牛舍", herd: "泌乳高峰群", formula: "泌乳高峰日粮", feedBatch: "FD-N-20260704", plannedAmount: 8.5, actualAmount: 8.5, leftoverAmount: 0.4, dryMatterRatio: 0.52, intakeStatus: "正常", autoDeduct: true, abnormalNote: "", remark: "" });
   const sourceText = { manual: "管理员派发", exception: "异常上报", system: "系统规则", quality: "质检异常", inventory: "库存预警", breeding: "繁育提醒" };
   const allOrders = demo.mobileRole === "只读访客"
     ? (demo.data.workOrders || [])
@@ -922,8 +925,42 @@ export function WorkOrdersPage() {
     if (!selectedOrder) return;
     demo.submitWorkOrderResult(selectedOrder.id, resultForm);
     setSelectedOrder(null);
+    setActiveOrderForm(null);
     setResultForm({ result: "已完成现场处理，未发现新增异常。", finishedAt: nowTime(), photo: "现场照片上传占位", exceptionNote: "", remark: "" });
   });
+  const submitOrderFeeding = useSubmit(() => {
+    if (!selectedOrder) return;
+    const calc = calcFeeding(orderFeedingForm);
+    demo.submitFeedingRecord({ ...orderFeedingForm, executor: user.name, abnormalNote: orderFeedingForm.abnormalNote });
+    demo.submitWorkOrderResult(selectedOrder.id, {
+      result: `已提交饲喂记录：实际${orderFeedingForm.actualAmount}吨，剩料${orderFeedingForm.leftoverAmount}吨，偏差率${calc.deviationRate}%。`,
+      finishedAt: nowTime(),
+      photo: "现场照片上传占位",
+      exceptionNote: orderFeedingForm.abnormalNote,
+      remark: orderFeedingForm.remark
+    });
+    setSelectedOrder(null);
+    setActiveOrderForm(null);
+  });
+  const saveDispatchDraft = () => {
+    try {
+      demo.saveDraft("工单派发", dispatchForm.title, dispatchForm);
+      setShowDispatch(false);
+      window.alert("已保存到草稿箱。");
+    } catch (error) {
+      window.alert(error.message || "保存失败");
+    }
+  };
+  const saveOrderFeedingDraft = () => {
+    try {
+      demo.saveDraft("饲喂工单处理", selectedOrder?.title || "饲喂工单", orderFeedingForm);
+      setSelectedOrder(null);
+      setActiveOrderForm(null);
+      window.alert("已保存到草稿箱。");
+    } catch (error) {
+      window.alert(error.message || "保存失败");
+    }
+  };
   const readonlyAlert = () => window.alert("当前为只读演示模式，不能执行该操作。");
   const startOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "处理中");
   const cancelOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "已取消");
@@ -932,6 +969,20 @@ export function WorkOrdersPage() {
     if (demo.isReadonly) return readonlyAlert();
     const reason = window.prompt("请输入驳回原因", "处理结果不完整，请补充现场说明。") || "请重新处理";
     demo.reviewWorkOrder(order.id, "reject", reason);
+  };
+  const openOrderProcess = (order) => {
+    setSelectedOrder(order);
+    if (String(order.type || "").includes("饲喂")) {
+      setOrderFeedingForm((current) => ({
+        ...current,
+        barn: String(order.relatedObject || "").split("/")[0]?.trim() || current.barn,
+        herd: String(order.relatedObject || "").split("/")[1]?.trim() || current.herd,
+        remark: order.operationRequirement || order.content || ""
+      }));
+      setActiveOrderForm("feeding");
+    } else {
+      setActiveOrderForm("result");
+    }
   };
   const renderOrderList = (list, emptyText, options = {}) => (
     <div className="space-y-3">
@@ -943,7 +994,7 @@ export function WorkOrdersPage() {
           canReview={options.adminReview && order.status === "待复核"}
           canCancel={options.adminCancel && !["已完成", "已取消"].includes(order.status)}
           onStart={() => startOrder(order)}
-          onSubmitResult={() => setSelectedOrder(order)}
+          onSubmitResult={() => openOrderProcess(order)}
           onApprove={() => approveOrder(order)}
           onReject={() => rejectOrder(order)}
           onCancel={() => cancelOrder(order)}
@@ -972,31 +1023,6 @@ export function WorkOrdersPage() {
             </div>
           </SectionCard>
 
-          {showDispatch && (
-            <SectionCard title="工单派发" desc="管理员创建工单后，员工会收到消息并在本人工单页看到任务。">
-              <div className="grid gap-3">
-                <Field label="工单标题"><TextInput value={dispatchForm.title} onChange={(e) => setDispatchForm({ ...dispatchForm, title: e.target.value })} /></Field>
-                <Field label="工单类型"><SelectInput value={dispatchForm.type} onChange={(e) => setDispatchForm({ ...dispatchForm, type: e.target.value })}>{["饲喂工单", "产奶工单", "繁育工单", "牛只观察工单", "牛只异常处理工单", "库存盘点工单", "领料处理工单", "入库工单", "出库工单", "质检工单", "交接班工单", "其他工单"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-                <Field label="所属组织"><SelectInput value={dispatchForm.organizationName} onChange={(e) => setDispatchForm({ ...dispatchForm, organizationName: e.target.value })}>{organizations.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="关联对象"><SelectInput value={dispatchForm.relatedObjectType} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObjectType: e.target.value })}>{["牛舍", "牛群", "牛号", "物料", "批次", "质检样品", "库存物料", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-                  <Field label="对象名称"><TextInput value={dispatchForm.relatedObject} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObject: e.target.value })} /></Field>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="派发给"><SelectInput value={dispatchForm.handler} onChange={(e) => setDispatchForm({ ...dispatchForm, handler: e.target.value })}>{employeeNames.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-                  <Field label="优先级"><SelectInput value={dispatchForm.priority} onChange={(e) => setDispatchForm({ ...dispatchForm, priority: e.target.value })}>{["普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-                </div>
-                <Field label="截止时间"><TextInput value={dispatchForm.deadline} onChange={(e) => setDispatchForm({ ...dispatchForm, deadline: e.target.value })} /></Field>
-                <Field label="工单说明"><TextArea value={dispatchForm.content} onChange={(e) => setDispatchForm({ ...dispatchForm, content: e.target.value })} /></Field>
-                <Field label="操作要求"><TextArea value={dispatchForm.operationRequirement} onChange={(e) => setDispatchForm({ ...dispatchForm, operationRequirement: e.target.value })} /></Field>
-                <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requirePhoto} onChange={(e) => setDispatchForm({ ...dispatchForm, requirePhoto: e.target.checked })} />需要员工上传照片</label>
-                <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requireReview} onChange={(e) => setDispatchForm({ ...dispatchForm, requireReview: e.target.checked })} />需要管理员复核</label>
-                <Field label="备注"><TextArea value={dispatchForm.remark} onChange={(e) => setDispatchForm({ ...dispatchForm, remark: e.target.value })} /></Field>
-                <SubmitBar disabled={demo.isReadonly} onClick={submitDispatch}>确认派发工单</SubmitBar>
-              </div>
-            </SectionCard>
-          )}
-
           <SectionCard title="筛选">
             <div className="grid grid-cols-2 gap-3">
               <Field label="员工"><SelectInput value={filters.employee} onChange={(e) => setFilters({ ...filters, employee: e.target.value })}>{["全部", ...employeeNames].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
@@ -1022,21 +1048,69 @@ export function WorkOrdersPage() {
 
       {demo.mobileRole !== "管理员" && (
         <>
-          {selectedOrder && (
-            <SectionCard title="提交处理结果" desc={selectedOrder.title}>
-              <div className="grid gap-3">
-                <Field label="处理结果"><TextArea value={resultForm.result} onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })} /></Field>
-                <Field label="完成时间"><TextInput value={resultForm.finishedAt} onChange={(e) => setResultForm({ ...resultForm, finishedAt: e.target.value })} /></Field>
-                <Field label="现场照片"><TextInput value={resultForm.photo} onChange={(e) => setResultForm({ ...resultForm, photo: e.target.value })} /></Field>
-                <Field label="异常说明"><TextArea value={resultForm.exceptionNote} onChange={(e) => setResultForm({ ...resultForm, exceptionNote: e.target.value })} /></Field>
-                <Field label="备注"><TextArea value={resultForm.remark} onChange={(e) => setResultForm({ ...resultForm, remark: e.target.value })} /></Field>
-                <SubmitBar disabled={demo.isReadonly} onClick={submitResult}>提交处理结果</SubmitBar>
-              </div>
-            </SectionCard>
-          )}
           {renderOrderList(filteredOrders, "暂无我的工单", { employeeActions: !demo.isReadonly })}
         </>
       )}
+
+      <MobileFormSheet open={showDispatch} title="派发工单" description="创建工单并分配给员工，员工会收到消息提醒。" onClose={() => setShowDispatch(false)} onSaveDraft={saveDispatchDraft} onSubmit={submitDispatch} submitText="确认派发">
+        <div className="grid gap-3">
+          <Field label="工单标题"><TextInput value={dispatchForm.title} onChange={(e) => setDispatchForm({ ...dispatchForm, title: e.target.value })} /></Field>
+          <Field label="工单类型"><SelectInput value={dispatchForm.type} onChange={(e) => setDispatchForm({ ...dispatchForm, type: e.target.value })}>{["饲喂工单", "产奶工单", "繁育工单", "牛只观察工单", "牛只异常处理工单", "库存盘点工单", "领料处理工单", "入库工单", "出库工单", "质检工单", "交接班工单", "其他工单"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="所属组织"><SelectInput value={dispatchForm.organizationName} onChange={(e) => setDispatchForm({ ...dispatchForm, organizationName: e.target.value })}>{organizations.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="关联对象"><SelectInput value={dispatchForm.relatedObjectType} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObjectType: e.target.value })}>{["牛舍", "牛群", "牛号", "物料", "批次", "质检样品", "库存物料", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            <Field label="对象名称"><TextInput value={dispatchForm.relatedObject} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObject: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="派发给"><SelectInput value={dispatchForm.handler} onChange={(e) => setDispatchForm({ ...dispatchForm, handler: e.target.value })}>{employeeNames.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            <Field label="优先级"><SelectInput value={dispatchForm.priority} onChange={(e) => setDispatchForm({ ...dispatchForm, priority: e.target.value })}>{["普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          </div>
+          <Field label="截止时间"><TextInput value={dispatchForm.deadline} onChange={(e) => setDispatchForm({ ...dispatchForm, deadline: e.target.value })} /></Field>
+          <Field label="工单说明"><TextArea value={dispatchForm.content} onChange={(e) => setDispatchForm({ ...dispatchForm, content: e.target.value })} /></Field>
+          <Field label="操作要求"><TextArea value={dispatchForm.operationRequirement} onChange={(e) => setDispatchForm({ ...dispatchForm, operationRequirement: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requirePhoto} onChange={(e) => setDispatchForm({ ...dispatchForm, requirePhoto: e.target.checked })} />需要员工上传照片</label>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requireReview} onChange={(e) => setDispatchForm({ ...dispatchForm, requireReview: e.target.checked })} />需要管理员复核</label>
+          <Field label="备注"><TextArea value={dispatchForm.remark} onChange={(e) => setDispatchForm({ ...dispatchForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeOrderForm === "result"} title="提交处理结果" description={selectedOrder?.title || "工单处理"} onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={() => demo.isReadonly ? readonlyAlert() : demo.saveDraft("工单处理", selectedOrder?.title || "工单处理", resultForm)} onSubmit={submitResult} submitText="提交结果">
+        <div className="grid gap-3">
+          <Field label="处理结果"><TextArea value={resultForm.result} onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })} /></Field>
+          <Field label="完成时间"><TextInput value={resultForm.finishedAt} onChange={(e) => setResultForm({ ...resultForm, finishedAt: e.target.value })} /></Field>
+          <Field label="现场照片"><TextInput value={resultForm.photo} onChange={(e) => setResultForm({ ...resultForm, photo: e.target.value })} /></Field>
+          <Field label="异常说明"><TextArea value={resultForm.exceptionNote} onChange={(e) => setResultForm({ ...resultForm, exceptionNote: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={resultForm.remark} onChange={(e) => setResultForm({ ...resultForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeOrderForm === "feeding"} title="处理饲喂工单" description={selectedOrder?.title || "提交饲喂记录并流转工单状态。"} onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={saveOrderFeedingDraft} onSubmit={submitOrderFeeding} submitText="提交饲喂并完成工单">
+        <div className="grid gap-3">
+          <Field label="日期"><TextInput value={orderFeedingForm.date} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, date: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="班次"><SelectInput value={orderFeedingForm.shift} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, shift: e.target.value })}>{["早", "中", "晚", "夜"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            <Field label="采食情况"><SelectInput value={orderFeedingForm.intakeStatus} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, intakeStatus: e.target.value })}>{["正常", "偏低", "拒食", "异常"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          </div>
+          <Field label="牛舍"><TextInput value={orderFeedingForm.barn} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, barn: e.target.value })} /></Field>
+          <Field label="牛群"><TextInput value={orderFeedingForm.herd} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, herd: e.target.value })} /></Field>
+          <Field label="饲喂配方"><TextInput value={orderFeedingForm.formula} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, formula: e.target.value })} /></Field>
+          <Field label="饲料批次"><TextInput value={orderFeedingForm.feedBatch} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, feedBatch: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="计划投喂量"><TextInput value={orderFeedingForm.plannedAmount} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, plannedAmount: e.target.value })} /></Field>
+            <Field label="实际投喂量"><TextInput value={orderFeedingForm.actualAmount} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, actualAmount: e.target.value })} /></Field>
+            <Field label="剩料量"><TextInput value={orderFeedingForm.leftoverAmount} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, leftoverAmount: e.target.value })} /></Field>
+            <Field label="干物质比例"><TextInput value={orderFeedingForm.dryMatterRatio} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, dryMatterRatio: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="偏差率" value={`${calcFeeding(orderFeedingForm).deviationRate}%`} tone="amber" />
+            <MiniStat label="剩料率" value={`${calcFeeding(orderFeedingForm).leftoverRate}%`} tone="amber" />
+            <MiniStat label="干物质采食" value={calcFeeding(orderFeedingForm).dryMatterIntake} />
+          </div>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={orderFeedingForm.autoDeduct} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, autoDeduct: e.target.checked })} />自动扣减库存</label>
+          <Field label="异常说明"><TextArea value={orderFeedingForm.abnormalNote} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, abnormalNote: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={orderFeedingForm.remark} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
     </div>
   );
 }
