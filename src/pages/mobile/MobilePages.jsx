@@ -1,17 +1,23 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, Boxes, ClipboardList, FileText, HeartPulse, Milk, PackageCheck, Search, Send, Wheat } from "lucide-react";
+import { AlertTriangle, BookOpen, Boxes, ClipboardList, FileText, HeartHandshake, HeartPulse, Milk, PackageCheck, Search, Wheat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDemo } from "../../context/DemoContext.jsx";
 import {
   AdminBadge,
   Field,
   GuardButton,
+  DraftBox,
+  EmployeeStatsCard,
+  EmptyState,
   MessageCard,
   MiniStat,
+  OperationManualCard,
   PageTitle,
+  QuickActionGrid,
   ReadOnlyNotice,
   SectionCard,
   SelectInput,
+  SmartWorkOrderCard,
   StatusTag,
   SubmitBar,
   TaskCard,
@@ -31,6 +37,33 @@ function useSubmit(action) {
     } catch (error) {
       window.alert(error.message || "提交失败");
     }
+  };
+}
+
+function calcFeeding(form) {
+  const planned = Number(form.plannedAmount || 0);
+  const actual = Number(form.actualAmount || 0);
+  const leftover = Number(form.leftoverAmount || 0);
+  const dry = Number(form.dryMatterRatio || 0);
+  const deviationAmount = actual - planned;
+  const deviationRate = planned ? (deviationAmount / planned) * 100 : 0;
+  const leftoverRate = actual ? (leftover / actual) * 100 : 0;
+  const dryMatterIntake = (actual - leftover) * dry;
+  return {
+    deviationAmount: deviationAmount.toFixed(2),
+    deviationRate: deviationRate.toFixed(1),
+    leftoverRate: leftoverRate.toFixed(1),
+    dryMatterIntake: dryMatterIntake.toFixed(2)
+  };
+}
+
+function calcMilk(form) {
+  const total = Number(form.totalMilk || 0);
+  const count = Number(form.milkingCowCount || 0);
+  const abnormal = Number(form.abnormalMilk || 0);
+  return {
+    avgMilkPerCow: count ? (total / count).toFixed(2) : "0.00",
+    abnormalMilkRate: total ? ((abnormal / total) * 100).toFixed(1) : "0.0"
   };
 }
 
@@ -56,25 +89,46 @@ export function MobileHomePage() {
   const demo = useDemo();
   const data = demo.data;
   const tasks = visibleForUser(data.mobileTasks, demo);
+  const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => !["已完成", "已驳回"].includes(item.status));
   const workOrders = visibleForUser(data.workOrders, demo).filter((item) => !["已完成", "已驳回"].includes(item.status));
   const messages = visibleForUser(data.messages, demo, ["receiver", "createdBy"]).slice(0, 3);
   const myRecords = demo.mobileRole === "管理员" ? (data.myRecords || []).slice(0, 4) : (data.myRecords || []).filter((item) => item.createdBy === demo.currentUser?.name).slice(0, 4);
-  const urgent = [...tasks, ...workOrders, ...(data.messages || [])].filter((item) => ["紧急", "重要"].includes(item.priority) || item.urgency === "紧急").length;
+  const urgent = [...tasks, ...smartOrders, ...workOrders, ...(data.messages || [])].filter((item) => ["紧急", "重要"].includes(item.priority) || item.urgency === "紧急").length;
   const doneToday = (data.myRecords || []).filter((item) => String(item.createdAt || "").startsWith(today())).length;
+  const pendingApprovals = (data.materialRequests || []).filter((item) => item.status === "待审核").length;
+  const qualityFails = (data.qualityInspections || []).filter((item) => item.result === "不合格").length;
+  const feedingDeviation = (data.feedingRecords || []).filter((item) => Math.abs(Number(item.deviationRate || 0)) > 10).length;
 
   return (
     <div>
       <PageTitle title={demo.mobileRole === "管理员" ? "管理员工作台" : "今日工作台"} desc="先看待办，再处理工单，现场业务随手提交。" action={<AdminBadge />} />
       <ReadOnlyNotice />
       <div className="mb-4 grid grid-cols-2 gap-3">
-        <MiniStat label="今日待办" value={tasks.filter((item) => item.status !== "已完成").length} />
+        <MiniStat label="今日待办" value={tasks.filter((item) => item.status !== "已完成").length + smartOrders.length} />
         <MiniStat label="紧急任务" value={urgent} tone="red" />
-        <MiniStat label="待处理工单" value={workOrders.length} tone="amber" />
+        <MiniStat label="待处理工单" value={smartOrders.length + workOrders.length} tone="amber" />
         <MiniStat label="今日已提交" value={doneToday} />
       </div>
+      {demo.mobileRole === "管理员" && (
+        <SectionCard title="管理员提醒">
+          <div className="grid grid-cols-2 gap-3">
+            <MiniStat label="待审核" value={pendingApprovals} tone="amber" />
+            <MiniStat label="异常工单" value={workOrders.filter((item) => item.status !== "已完成").length} tone="red" />
+            <MiniStat label="饲喂偏差" value={feedingDeviation} tone="amber" />
+            <MiniStat label="质检不合格" value={qualityFails} tone="red" />
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title="今日智能工单" desc="按紧急程度和截止时间优先处理">
+        <div className="space-y-3">
+          {smartOrders.slice(0, 5).map((order) => <SmartWorkOrderCard key={order.id} order={order} onStatus={(status) => demo.updateMobileWorkOrder(order.id, status)} />)}
+          {!smartOrders.length && <EmptyState title="今日智能工单已清空" desc="新的异常、质检和库存提醒会自动生成工单。" />}
+        </div>
+      </SectionCard>
 
       <SectionCard title="快捷操作">
-        <div className="grid grid-cols-2 gap-3">
+        <QuickActionGrid>
           <QuickLink to="/feeding" icon={Wheat} title="饲喂记录" desc="投料、剩料、采食" />
           <QuickLink to="/milk" icon={Milk} title="产奶记录" desc="班次、奶量、送检" />
           <QuickLink to="/breeding" icon={HeartPulse} title="繁育记录" desc="发情、配种、妊检" />
@@ -82,8 +136,10 @@ export function MobileHomePage() {
           <QuickLink to="/inventory" icon={Boxes} title="库存申请" desc="领料、入库、盘点" />
           <QuickLink to="/quality" icon={PackageCheck} title="质检记录" desc="原奶、饲料、成品" />
           <QuickLink to="/reports" icon={AlertTriangle} title="异常上报" desc="异常自动成工单" />
+          <QuickLink to="/handover" icon={HeartHandshake} title="交接班" desc="未完成和异常交接" />
+          <QuickLink to="/manuals" icon={BookOpen} title="操作手册" desc="现场规范快速看" />
           <QuickLink to="/records" icon={FileText} title="我的记录" desc="我提交和处理的事" />
-        </div>
+        </QuickActionGrid>
       </SectionCard>
 
       <SectionCard title={demo.mobileRole === "管理员" ? "今日任务" : "我的待办"}>
@@ -127,6 +183,7 @@ export function MobileHomePage() {
 export function TasksPage() {
   const demo = useDemo();
   const tasks = visibleForUser(demo.data.mobileTasks, demo);
+  const smartOrders = visibleForUser(demo.data.smartWorkOrders, demo);
   const jobs = [
     { to: "/feeding", title: "饲喂管理", desc: "今日饲喂任务、执行记录、剩料和异常" },
     { to: "/milk", title: "产奶管理", desc: "挤奶任务、入罐、异常奶和送检" },
@@ -134,12 +191,17 @@ export function TasksPage() {
     { to: "/cattle", title: "牛只管理", desc: "快速查牛、事件上报、健康防疫" },
     { to: "/inventory", title: "库存管理", desc: "领料、入库、出库、盘点" },
     { to: "/quality", title: "质检管理", desc: "原奶、饲料、成品质检" },
-    { to: "/reports", title: "异常上报", desc: "牛只、饲喂、产奶、库存等异常" }
+    { to: "/reports", title: "异常上报", desc: "牛只、饲喂、产奶、库存等异常" },
+    { to: "/handover", title: "交接班", desc: "未完成事项、重点牛只和异常交接" },
+    { to: "/manuals", title: "操作手册", desc: "现场规范和注意事项" }
   ];
   return (
     <div>
-      <PageTitle title="今日待办" desc="先处理未完成和紧急任务。" />
-      <SectionCard title="任务列表">
+      <PageTitle title="今日智能工单" desc="先处理紧急、超时和异常工单。" />
+      <SectionCard title="智能工单">
+        <div className="space-y-3">{smartOrders.map((order) => <SmartWorkOrderCard key={order.id} order={order} onStatus={(status) => demo.updateMobileWorkOrder(order.id, status)} />)}</div>
+      </SectionCard>
+      <SectionCard title="今日待办">
         <div className="space-y-3">{tasks.map((task) => <TaskCard key={task.id} task={task} />)}</div>
       </SectionCard>
       <SectionCard title="作业入口">
@@ -170,16 +232,20 @@ export function FeedingPage() {
     plannedAmount: task.plannedAmount || 8.5,
     actualAmount: task.plannedAmount || 8.5,
     leftoverAmount: 0.4,
+    dryMatterRatio: 0.52,
     waterStatus: "正常",
     intakeStatus: "正常",
+    abnormalType: "无",
     executor: demo.currentUser?.name || "刘师傅",
-    executedAt: nowTime(),
+    startedAt: nowTime(),
+    finishedAt: nowTime(),
     autoDeduct: true,
     abnormalNote: "",
     photo: "现场照片占位",
     remark: ""
   });
   const submit = useSubmit(() => demo.submitFeedingRecord(form));
+  const feedingCalc = calcFeeding(form);
 
   return (
     <div>
@@ -201,15 +267,25 @@ export function FeedingPage() {
             <Field label="实际投喂量(吨)"><TextInput type="number" value={form.actualAmount} onChange={(e) => setForm({ ...form, actualAmount: e.target.value })} /></Field>
           </div>
           <Field label="剩料量(吨)"><TextInput type="number" value={form.leftoverAmount} onChange={(e) => setForm({ ...form, leftoverAmount: e.target.value })} /></Field>
+          <Field label="饲料干物质比例"><TextInput type="number" step="0.01" value={form.dryMatterRatio} onChange={(e) => setForm({ ...form, dryMatterRatio: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3 rounded-[8px] bg-emerald-50 p-3">
+            <MiniStat label="偏差量(吨)" value={feedingCalc.deviationAmount} />
+            <MiniStat label="偏差率" value={`${feedingCalc.deviationRate}%`} tone={Math.abs(Number(feedingCalc.deviationRate)) > 10 ? "red" : "emerald"} />
+            <MiniStat label="剩料率" value={`${feedingCalc.leftoverRate}%`} tone={Number(feedingCalc.leftoverRate) > 12 ? "red" : "emerald"} />
+            <MiniStat label="干物质采食" value={`${feedingCalc.dryMatterIntake}吨`} />
+          </div>
           <Field label="饮水情况"><SelectInput value={form.waterStatus} onChange={(e) => setForm({ ...form, waterStatus: e.target.value })}><option>正常</option><option>偏少</option><option>停水</option><option>异常</option></SelectInput></Field>
           <Field label="采食情况"><SelectInput value={form.intakeStatus} onChange={(e) => setForm({ ...form, intakeStatus: e.target.value })}><option>正常</option><option>偏低</option><option>拒食</option><option>异常</option></SelectInput></Field>
+          <Field label="饲喂异常类型"><SelectInput value={form.abnormalType} onChange={(e) => setForm({ ...form, abnormalType: e.target.value })}><option>无</option><option>饲料不足</option><option>饲料霉变</option><option>投喂偏差过大</option><option>剩料过多</option><option>牛群采食异常</option><option>配方错误</option><option>其他</option></SelectInput></Field>
           <Field label="执行人"><TextInput value={form.executor} onChange={(e) => setForm({ ...form, executor: e.target.value })} /></Field>
-          <Field label="执行时间"><TextInput value={form.executedAt} onChange={(e) => setForm({ ...form, executedAt: e.target.value })} /></Field>
+          <Field label="开始时间"><TextInput value={form.startedAt} onChange={(e) => setForm({ ...form, startedAt: e.target.value })} /></Field>
+          <Field label="完成时间"><TextInput value={form.finishedAt} onChange={(e) => setForm({ ...form, finishedAt: e.target.value })} /></Field>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.autoDeduct} onChange={(e) => setForm({ ...form, autoDeduct: e.target.checked })} /> 自动扣减库存</label>
           <Field label="异常说明"><TextArea value={form.abnormalNote} onChange={(e) => setForm({ ...form, abnormalNote: e.target.value })} placeholder="饲料不足、霉变、采食异常、配方错误、设备异常等" /></Field>
           <Field label="现场照片"><TextInput value={form.photo} onChange={(e) => setForm({ ...form, photo: e.target.value })} /></Field>
           <Field label="备注"><TextArea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></Field>
         </div>
+        <GuardButton onClick={() => demo.saveDraft("饲喂管理", `${form.barn}${form.shift}班饲喂`, form)} className="mt-4 min-h-12 w-full rounded-[8px] bg-slate-100 text-base font-black text-slate-700">保存草稿</GuardButton>
         <SubmitBar disabled={demo.isReadonly} onClick={submit}>提交饲喂记录</SubmitBar>
       </SectionCard>
     </div>
@@ -230,6 +306,11 @@ export function MilkPage() {
     totalMilk: 8.2,
     qualifiedMilk: 8.0,
     abnormalMilk: 0.2,
+    abnormalCowNo: "HL-N-1028",
+    abnormalCowType: "乳房炎",
+    abnormalMilkHandle: "隔离",
+    notifyAdmin: true,
+    generateHealthOrder: true,
     tankNo: "1号奶罐",
     temperature: 3.8,
     protein: 3.2,
@@ -242,6 +323,7 @@ export function MilkPage() {
     remark: ""
   });
   const submit = useSubmit(() => demo.submitMilkRecord(form));
+  const milkCalc = calcMilk(form);
   return (
     <div>
       <PageTitle title="产奶管理" desc="录入班次奶量、异常奶、入罐和送检。" />
@@ -256,7 +338,11 @@ export function MilkPage() {
           <Field label="牛舍"><TextInput value={form.barn} onChange={(e) => setForm({ ...form, barn: e.target.value })} /></Field>
           <Field label="牛群"><TextInput value={form.herd} onChange={(e) => setForm({ ...form, herd: e.target.value })} /></Field>
           <Field label="泌乳牛头数"><TextInput type="number" value={form.milkingCowCount} onChange={(e) => setForm({ ...form, milkingCowCount: e.target.value })} /></Field>
-          <Field label="挤奶员"><TextInput value={form.milker} onChange={(e) => setForm({ ...form, milker: e.target.value })} /></Field>
+          <Field label="执行人"><TextInput value={form.milker} onChange={(e) => setForm({ ...form, milker: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3 rounded-[8px] bg-emerald-50 p-3">
+            <MiniStat label="单牛平均产奶" value={`${milkCalc.avgMilkPerCow}吨`} />
+            <MiniStat label="异常奶比例" value={`${milkCalc.abnormalMilkRate}%`} tone={Number(milkCalc.abnormalMilkRate) > 5 ? "red" : "emerald"} />
+          </div>
           <div className="grid grid-cols-3 gap-2">
             <Field label="总奶量"><TextInput type="number" value={form.totalMilk} onChange={(e) => setForm({ ...form, totalMilk: e.target.value })} /></Field>
             <Field label="合格奶"><TextInput type="number" value={form.qualifiedMilk} onChange={(e) => setForm({ ...form, qualifiedMilk: e.target.value })} /></Field>
@@ -271,10 +357,22 @@ export function MilkPage() {
           </div>
           <Field label="菌落总数"><TextInput value={form.colony} onChange={(e) => setForm({ ...form, colony: e.target.value })} /></Field>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.sendInspection} onChange={(e) => setForm({ ...form, sendInspection: e.target.checked })} /> 是否送检</label>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.sendInspection} onChange={(e) => setForm({ ...form, sendInspection: e.target.checked })} /> 是否生成质检工单</label>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.generateDelivery} onChange={(e) => setForm({ ...form, generateDelivery: e.target.checked })} /> 生成原奶配送任务</label>
+          <div className="rounded-[8px] bg-slate-50 p-3">
+            <p className="mb-3 text-base font-black text-slate-800">异常奶登记</p>
+            <div className="grid gap-3">
+              <Field label="牛号"><TextInput value={form.abnormalCowNo} onChange={(e) => setForm({ ...form, abnormalCowNo: e.target.value })} /></Field>
+              <Field label="异常类型"><SelectInput value={form.abnormalCowType} onChange={(e) => setForm({ ...form, abnormalCowType: e.target.value })}><option>乳房炎</option><option>血奶</option><option>药残风险</option><option>初乳</option><option>其他</option></SelectInput></Field>
+              <Field label="处理方式"><SelectInput value={form.abnormalMilkHandle} onChange={(e) => setForm({ ...form, abnormalMilkHandle: e.target.value })}><option>隔离</option><option>废弃</option><option>单独存放</option></SelectInput></Field>
+              <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.notifyAdmin} onChange={(e) => setForm({ ...form, notifyAdmin: e.target.checked })} /> 是否通知管理员</label>
+              <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.generateHealthOrder} onChange={(e) => setForm({ ...form, generateHealthOrder: e.target.checked })} /> 生成牛只健康工单</label>
+            </div>
+          </div>
           <Field label="异常奶说明"><TextArea value={form.abnormalNote} onChange={(e) => setForm({ ...form, abnormalNote: e.target.value })} placeholder="乳房炎、血奶、药残风险、初乳等" /></Field>
           <Field label="备注"><TextArea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></Field>
         </div>
+        <GuardButton onClick={() => demo.saveDraft("产奶管理", `${form.barn}${form.shift}产奶`, form)} className="mt-4 min-h-12 w-full rounded-[8px] bg-slate-100 text-base font-black text-slate-700">保存草稿</GuardButton>
         <SubmitBar disabled={demo.isReadonly} onClick={submit}>提交产奶记录</SubmitBar>
       </SectionCard>
     </div>
@@ -360,6 +458,16 @@ export function CattlePage() {
           <Field label="事件类型"><SelectInput value={event.type} onChange={(e) => setEvent({ ...event, type: e.target.value })}><option>转群</option><option>疾病</option><option>用药</option><option>防疫</option><option>淘汰</option><option>死亡</option><option>异常行为</option><option>其他</option></SelectInput></Field>
           <Field label="事件时间"><TextInput value={event.eventTime} onChange={(e) => setEvent({ ...event, eventTime: e.target.value })} /></Field>
           <Field label="处理人"><TextInput value={event.handler} onChange={(e) => setEvent({ ...event, handler: e.target.value })} /></Field>
+          {event.type === "用药" && (
+            <div className="grid gap-3 rounded-[8px] bg-slate-50 p-3">
+              <p className="text-base font-black text-slate-800">用药与休药期</p>
+              <Field label="药品名称"><TextInput value={event.medicineName || "乳房炎用药"} onChange={(e) => setEvent({ ...event, medicineName: e.target.value })} /></Field>
+              <Field label="剂量"><TextInput value={event.dose || "20ml"} onChange={(e) => setEvent({ ...event, dose: e.target.value })} /></Field>
+              <Field label="休药期天数"><TextInput type="number" value={event.withdrawalDays || 3} onChange={(e) => setEvent({ ...event, withdrawalDays: e.target.value })} /></Field>
+              <Field label="预计解除日期"><TextInput value={event.releaseDate || "2026-07-08"} onChange={(e) => setEvent({ ...event, releaseDate: e.target.value })} /></Field>
+              <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-white px-3 text-base font-black"><input type="checkbox" checked={event.affectMilk !== false} onChange={(e) => setEvent({ ...event, affectMilk: e.target.checked })} /> 是否影响产奶</label>
+            </div>
+          )}
           <Field label="处理方式"><TextArea value={event.method} onChange={(e) => setEvent({ ...event, method: e.target.value })} /></Field>
           <Field label="图片上传"><TextInput value={event.photo} onChange={(e) => setEvent({ ...event, photo: e.target.value })} /></Field>
           <Field label="备注"><TextArea value={event.remark} onChange={(e) => setEvent({ ...event, remark: e.target.value })} /></Field>
@@ -386,6 +494,20 @@ export function InventoryPage() {
         </div>
         {low.length > 0 && <div className="mt-3 rounded-[8px] bg-red-50 p-3 text-sm font-black text-red-700">低库存预警：{low.map((item) => item.name).join("、")}</div>}
       </SectionCard>
+      <SectionCard title="库存批次">
+        <div className="space-y-3">
+          {(demo.data.inventoryItems || []).map((item) => (
+            <div key={item.id} className="rounded-[8px] bg-slate-50 p-4">
+              <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{item.name}</p><p className="text-sm font-bold text-slate-500">{item.type} · {item.batch}</p></div><StatusTag status={item.status} /></div>
+              <div className="mt-3 grid gap-1 text-sm font-bold text-slate-600">
+                <p>库存：{item.stock}{item.unit} / 安全库存：{item.safeStock}{item.unit}</p>
+                <p>供应商：{item.supplier || "-"} · 仓库：{item.warehouse}</p>
+                <p>入库：{item.inboundAt || "-"} · 到期：{item.expireAt || "-"}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
       <SectionCard title="库存操作">
         <div className="mb-3 grid grid-cols-4 gap-2">{[["request", "领料"], ["in", "入库"], ["out", "出库"], ["count", "盘点"]].map(([value, label]) => <button key={value} onClick={() => setKind(value)} className={`min-h-11 rounded-[8px] text-sm font-black ${kind === value ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</button>)}</div>
         <div className="grid gap-3">
@@ -399,6 +521,7 @@ export function InventoryPage() {
           {kind === "count" && <><Field label="仓库"><TextInput value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })} /></Field><Field label="实盘数量"><TextInput type="number" value={form.actualStock} onChange={(e) => setForm({ ...form, actualStock: e.target.value })} /></Field><Field label="差异原因"><TextArea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></Field></>}
           <Field label="经办人"><TextInput value={form.handler} onChange={(e) => setForm({ ...form, handler: e.target.value })} /></Field>
         </div>
+        <GuardButton onClick={() => demo.saveDraft("库存管理", `${form.materialName}${kind === "request" ? "领料申请" : "库存操作"}`, { ...form, kind })} className="mt-4 min-h-12 w-full rounded-[8px] bg-slate-100 text-base font-black text-slate-700">保存草稿</GuardButton>
         <SubmitBar disabled={demo.isReadonly} onClick={submit}>{kind === "request" ? "提交领料申请" : kind === "in" ? "提交入库登记" : kind === "out" ? "提交出库登记" : "提交盘点记录"}</SubmitBar>
       </SectionCard>
     </div>
@@ -407,7 +530,7 @@ export function InventoryPage() {
 
 export function QualityPage() {
   const demo = useDemo();
-  const [form, setForm] = useState({ taskId: "quality-task-1", inspectionType: "原奶质检", sampleType: "原奶", batch: "HL-MILK-AM", sourceFarm: "合力牧业奶牛场", sampledAt: nowTime(), temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", acidity: "正常", drugResidue: "未检出", moisture: "12%", mildew: "无", impurity: "少量", smell: "正常", appearance: "正常", productName: "巴氏鲜奶", testItems: "感官、菌落、留样", result: "合格", sampleNo: "LY-001", inspector: demo.currentUser?.name || "质检员", reason: "", handleAdvice: "" });
+  const [form, setForm] = useState({ taskId: "quality-task-1", inspectionType: "原奶质检", sampleType: "原奶", batch: "HL-MILK-AM", sourceFarm: "合力牧业奶牛场", sampledAt: nowTime(), temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", acidity: "正常", drugResidue: "未检出", moisture: "12%", mildew: "无", impurity: "少量", smell: "正常", appearance: "正常", productName: "巴氏鲜奶", testItems: "感官、菌落、留样", result: "合格", sampleNo: "LY-001", inspector: demo.currentUser?.name || "质检员", reason: "", handleMethod: "隔离", handleAdvice: "" });
   const submit = useSubmit(() => demo.submitQualityInspection(form));
   return (
     <div>
@@ -424,8 +547,10 @@ export function QualityPage() {
           <Field label="是否合格"><SelectInput value={form.result} onChange={(e) => setForm({ ...form, result: e.target.value })}><option>合格</option><option>不合格</option></SelectInput></Field>
           <Field label="检测人"><TextInput value={form.inspector} onChange={(e) => setForm({ ...form, inspector: e.target.value })} /></Field>
           <Field label="不合格原因"><TextArea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></Field>
+          <Field label="处理方式"><SelectInput value={form.handleMethod} onChange={(e) => setForm({ ...form, handleMethod: e.target.value })}><option>隔离</option><option>退回</option><option>报废</option><option>复检</option><option>降级使用</option><option>复检合格</option></SelectInput></Field>
           <Field label="处理意见"><TextArea value={form.handleAdvice} onChange={(e) => setForm({ ...form, handleAdvice: e.target.value })} /></Field>
         </div>
+        <GuardButton onClick={() => demo.saveDraft("质检管理", `${form.batch}${form.inspectionType}`, form)} className="mt-4 min-h-12 w-full rounded-[8px] bg-slate-100 text-base font-black text-slate-700">保存草稿</GuardButton>
         <SubmitBar disabled={demo.isReadonly} onClick={submit}>提交质检记录</SubmitBar>
       </SectionCard>
     </div>
@@ -452,6 +577,74 @@ export function ExceptionReportPage() {
         </div>
         <SubmitBar disabled={demo.isReadonly} onClick={submit}>提交异常并生成工单</SubmitBar>
       </SectionCard>
+    </div>
+  );
+}
+
+export function HandoverPage() {
+  const demo = useDemo();
+  const [form, setForm] = useState({
+    fromUser: demo.currentUser?.name || "刘师傅",
+    toUser: "赵师傅",
+    shift: "早班",
+    handoverAt: nowTime(),
+    unfinishedItems: "A区泌乳牛舍晚班饲喂待执行",
+    abnormalCattle: "HL-N-1028 继续观察休药期",
+    abnormalInventory: "育肥牛饲料低库存",
+    abnormalQuality: "无",
+    focusCattle: "HL-N-1028、HL-N-1160",
+    notes: "晚班先复核剩料，再检查1号奶罐温度。",
+    attachment: "图片上传占位",
+    confirmed: true,
+    remark: ""
+  });
+  const submit = useSubmit(() => demo.submitShiftHandover(form));
+  return (
+    <div>
+      <PageTitle title="交接班" desc="记录未完成事项、重点牛只、异常库存和接班确认。" />
+      <ReadOnlyNotice />
+      <SectionCard title="最近交接班">
+        <div className="space-y-3">
+          {(demo.data.shiftHandovers || []).map((item) => (
+            <div key={item.id} className="rounded-[8px] bg-slate-50 p-4">
+              <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{item.shift}交接</p><p className="text-sm font-bold text-slate-500">{item.fromUser} 交给 {item.toUser} · {item.handoverAt}</p></div><StatusTag status={item.status} /></div>
+              <p className="mt-2 text-sm font-bold text-slate-600">未完成：{item.unfinishedItems || "无"}</p>
+              <p className="mt-1 text-sm font-bold text-slate-600">重点：{item.focusCattle || "无"}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+      <SectionCard title="提交交接班">
+        <div className="grid gap-3">
+          <Field label="交班人"><TextInput value={form.fromUser} onChange={(e) => setForm({ ...form, fromUser: e.target.value })} /></Field>
+          <Field label="接班人"><TextInput value={form.toUser} onChange={(e) => setForm({ ...form, toUser: e.target.value })} /></Field>
+          <Field label="班次"><SelectInput value={form.shift} onChange={(e) => setForm({ ...form, shift: e.target.value })}><option>早班</option><option>中班</option><option>晚班</option><option>夜班</option></SelectInput></Field>
+          <Field label="交接时间"><TextInput value={form.handoverAt} onChange={(e) => setForm({ ...form, handoverAt: e.target.value })} /></Field>
+          <Field label="未完成事项"><TextArea value={form.unfinishedItems} onChange={(e) => setForm({ ...form, unfinishedItems: e.target.value })} /></Field>
+          <Field label="异常牛只"><TextArea value={form.abnormalCattle} onChange={(e) => setForm({ ...form, abnormalCattle: e.target.value })} /></Field>
+          <Field label="异常库存"><TextArea value={form.abnormalInventory} onChange={(e) => setForm({ ...form, abnormalInventory: e.target.value })} /></Field>
+          <Field label="异常质检"><TextArea value={form.abnormalQuality} onChange={(e) => setForm({ ...form, abnormalQuality: e.target.value })} /></Field>
+          <Field label="重点观察牛只"><TextInput value={form.focusCattle} onChange={(e) => setForm({ ...form, focusCattle: e.target.value })} /></Field>
+          <Field label="今日注意事项"><TextArea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+          <Field label="附件 / 图片"><TextInput value={form.attachment} onChange={(e) => setForm({ ...form, attachment: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.confirmed} onChange={(e) => setForm({ ...form, confirmed: e.target.checked })} /> 接班确认</label>
+          <Field label="备注"><TextArea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></Field>
+        </div>
+        <GuardButton onClick={() => demo.saveDraft("交接班", `${form.shift}交接班`, form)} className="mt-4 min-h-12 w-full rounded-[8px] bg-slate-100 text-base font-black text-slate-700">保存草稿</GuardButton>
+        <SubmitBar disabled={demo.isReadonly} onClick={submit}>提交交接班</SubmitBar>
+      </SectionCard>
+    </div>
+  );
+}
+
+export function ManualsPage() {
+  const demo = useDemo();
+  return (
+    <div>
+      <PageTitle title="操作手册" desc="现场快速查看规范，短文案、少翻页。" />
+      <div className="space-y-3">
+        {(demo.data.operationManuals || []).map((manual) => <OperationManualCard key={manual.id} manual={manual} />)}
+      </div>
     </div>
   );
 }
@@ -484,9 +677,13 @@ export function MessagesPage() {
 export function RecordsPage() {
   const demo = useDemo();
   const records = demo.mobileRole === "管理员" ? demo.data.myRecords || [] : (demo.data.myRecords || []).filter((item) => item.createdBy === demo.currentUser?.name);
+  const drafts = demo.mobileRole === "管理员" ? demo.data.drafts || [] : (demo.data.drafts || []).filter((item) => item.createdBy === demo.currentUser?.name);
   return (
     <div>
-      <PageTitle title={demo.mobileRole === "管理员" ? "员工记录" : "我的记录"} desc="饲喂、产奶、繁育、质检、库存、异常和工单记录。" />
+      <PageTitle title={demo.mobileRole === "管理员" ? "员工记录" : "我的记录"} desc="饲喂、产奶、繁育、质检、库存、异常、交接班、工单和草稿。" />
+      <SectionCard title="草稿箱" desc="当前为前端演示，模拟离线暂存能力。">
+        <DraftBox drafts={drafts} onDelete={(id) => demo.deleteDraft(id)} />
+      </SectionCard>
       <div className="space-y-3">
         {records.map((item) => (
           <div key={item.id} className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -503,6 +700,10 @@ export function ProfilePage() {
   const demo = useDemo();
   const user = demo.currentUser || {};
   const mine = (demo.data.myRecords || []).filter((item) => item.createdBy === user.name);
+  const drafts = demo.mobileRole === "管理员" ? demo.data.drafts || [] : (demo.data.drafts || []).filter((item) => item.createdBy === user.name);
+  const stats = demo.mobileRole === "管理员" ? (demo.data.employeeStats || []) : (demo.data.employeeStats || []).filter((item) => item.employee === user.name);
+  const exceptionCount = (demo.data.exceptionReports || []).filter((item) => demo.mobileRole === "管理员" || item.createdBy === user.name).length;
+  const rejected = (demo.data.workOrders || []).filter((item) => item.status === "已驳回" && (demo.mobileRole === "管理员" || item.handler === user.name || item.initiator === user.name)).length;
   return (
     <div>
       <PageTitle title="个人中心" desc="身份、组织、记录和本机数据。" />
@@ -514,7 +715,21 @@ export function ProfilePage() {
         </div>
       </SectionCard>
       <SectionCard title="我的统计">
-        <div className="grid grid-cols-2 gap-3"><MiniStat label="我的提交" value={mine.length} /><MiniStat label="待办工单" value={(demo.data.workOrders || []).filter((item) => item.handler === user.name && item.status !== "已完成").length} tone="amber" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <MiniStat label="我的提交" value={mine.length} />
+          <MiniStat label="待办工单" value={(demo.data.workOrders || []).filter((item) => item.handler === user.name && item.status !== "已完成").length} tone="amber" />
+          <MiniStat label="异常上报" value={exceptionCount} tone="red" />
+          <MiniStat label="被驳回" value={rejected} tone="amber" />
+        </div>
+      </SectionCard>
+      <SectionCard title={demo.mobileRole === "管理员" ? "员工任务统计" : "我的任务统计"}>
+        <div className="space-y-3">
+          {stats.map((stat) => <EmployeeStatsCard key={stat.id} stat={stat} />)}
+          {!stats.length && <EmptyState title="暂无统计" desc="提交任务后会自动累计。" />}
+        </div>
+      </SectionCard>
+      <SectionCard title="草稿箱">
+        <DraftBox drafts={drafts} onDelete={(id) => demo.deleteDraft(id)} />
       </SectionCard>
       <SectionCard title="数据工具">
         <div className="grid gap-2">

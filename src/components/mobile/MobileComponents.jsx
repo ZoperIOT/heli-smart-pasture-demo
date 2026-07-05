@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Bell, ClipboardList, Home, MessageCircle, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { Bell, BookOpen, ClipboardList, FileText, Home, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
 import { useDemo } from "../../context/DemoContext.jsx";
 
 export function StatusTag({ status = "待处理", tone }) {
@@ -68,15 +68,14 @@ export function MobileTopBar() {
 export function BottomTabBar() {
   const tabs = [
     { to: "/app", label: "首页", icon: Home },
-    { to: "/tasks", label: "作业", icon: Wrench },
-    { to: "/work-orders", label: "工单", icon: ClipboardList },
+    { to: "/tasks", label: "工单", icon: ClipboardList },
     { to: "/messages", label: "消息", icon: MessageCircle },
     { to: "/profile", label: "我的", icon: UserRound }
   ];
   const location = useLocation();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-[520px] grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = location.pathname === tab.to || (tab.to === "/app" && location.pathname === "/");
@@ -90,6 +89,32 @@ export function BottomTabBar() {
       </div>
     </nav>
   );
+}
+
+export function SmartWorkOrderCard({ order, onStatus }) {
+  return (
+    <div className="rounded-[8px] border border-slate-100 bg-white p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-black text-slate-950">{order.title}</p>
+          <p className="mt-1 text-sm font-bold text-slate-500">{order.type} · {order.organizationName}</p>
+        </div>
+        <StatusTag status={order.priority || "普通"} />
+      </div>
+      <div className="mt-3 grid gap-1 text-sm font-bold text-slate-600">
+        <p>关联：{order.relatedObject || order.relatedBusiness || "-"}</p>
+        <p>处理人：{order.handler || "-"} · 截止：{order.deadline || order.plannedAt || "-"}</p>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <StatusTag status={order.status} />
+        {onStatus && <button onClick={() => onStatus("处理中")} className="ml-auto min-h-10 rounded-[8px] bg-emerald-700 px-3 text-sm font-black text-white">去处理</button>}
+      </div>
+    </div>
+  );
+}
+
+export function QuickActionGrid({ children }) {
+  return <div className="grid grid-cols-2 gap-3">{children}</div>;
 }
 
 export function PageTitle({ title, desc, action }) {
@@ -178,6 +203,73 @@ export function WorkOrderCard({ order, onStatus }) {
       )}
     </div>
   );
+}
+
+export function OperationManualCard({ manual }) {
+  return (
+    <div className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-emerald-50 text-emerald-700"><BookOpen size={20} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-black">{manual.title}</p>
+          <p className="text-sm font-bold text-slate-500">{manual.scene}</p>
+        </div>
+      </div>
+      <div className="mt-3 rounded-[8px] bg-slate-50 p-3">
+        <p className="text-sm font-black text-slate-500">步骤</p>
+        <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm font-semibold text-slate-700">
+          {(manual.steps || []).map((step) => <li key={step}>{step}</li>)}
+        </ol>
+      </div>
+      <p className="mt-3 text-sm font-bold text-amber-700">注意：{(manual.cautions || []).join("；")}</p>
+    </div>
+  );
+}
+
+export function EmployeeStatsCard({ stat }) {
+  return (
+    <div className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-black">{stat.employee}</p>
+          <p className="text-sm font-bold text-slate-500">{stat.organizationName}</p>
+        </div>
+        <StatusTag status={stat.status} />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <MiniStat label="今日完成" value={stat.todayDone} />
+        <MiniStat label="待处理" value={stat.pending} tone="amber" />
+        <MiniStat label="准确率" value={`${stat.feedingAccuracy}%`} />
+      </div>
+    </div>
+  );
+}
+
+export function DraftBox({ drafts = [], onDelete }) {
+  if (!drafts.length) {
+    return <div className="rounded-[8px] bg-slate-50 p-4 text-base font-bold text-slate-500">暂无草稿。表单里的“保存草稿”会模拟离线暂存。</div>;
+  }
+  return (
+    <div className="space-y-3">
+      {drafts.map((draft) => (
+        <div key={draft.id} className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-slate-100 text-slate-600"><FileText size={20} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-black">{draft.title}</p>
+              <p className="text-sm font-bold text-slate-500">{draft.module} · {draft.updatedAt}</p>
+            </div>
+            <StatusTag status="草稿" />
+          </div>
+          {onDelete && <button onClick={() => onDelete(draft.id)} className="mt-3 min-h-10 w-full rounded-[8px] bg-slate-100 text-sm font-black text-slate-700">删除草稿</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function EmptyState({ title = "暂无数据", desc = "完成提交后会显示在这里。" }) {
+  return <div className="rounded-[8px] bg-slate-50 p-5 text-center"><p className="text-lg font-black text-slate-700">{title}</p><p className="mt-1 text-sm font-bold text-slate-500">{desc}</p></div>;
 }
 
 export function Field({ label, children }) {

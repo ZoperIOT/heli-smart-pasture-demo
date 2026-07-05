@@ -6,7 +6,9 @@ import {
   CattlePage,
   ExceptionReportPage,
   FeedingPage,
+  HandoverPage,
   InventoryPage,
+  ManualsPage,
   MessagesPage,
   MilkPage,
   MobileHomePage,
@@ -27,6 +29,7 @@ export default function App() {
           <Route path="/mobile" element={<MobileHomePage />} />
           <Route path="/mobile-workbench" element={<MobileHomePage />} />
           <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/work" element={<TasksPage />} />
           <Route path="/feeding" element={<FeedingPage />} />
           <Route path="/feeding-records" element={<FeedingPage />} />
           <Route path="/feeding-plans" element={<FeedingPage />} />
@@ -49,7 +52,10 @@ export default function App() {
           <Route path="/finished-quality" element={<QualityPage />} />
           <Route path="/work-orders" element={<WorkOrdersPage />} />
           <Route path="/reports" element={<ExceptionReportPage />} />
+          <Route path="/exceptions" element={<ExceptionReportPage />} />
           <Route path="/exception-reports" element={<ExceptionReportPage />} />
+          <Route path="/handover" element={<HandoverPage />} />
+          <Route path="/manuals" element={<ManualsPage />} />
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
