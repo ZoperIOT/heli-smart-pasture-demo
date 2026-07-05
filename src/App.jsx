@@ -4,7 +4,6 @@ import { DemoProvider } from "./context/DemoContext.jsx";
 import {
   BreedingPage,
   CattlePage,
-  ContractsPage,
   ExceptionReportPage,
   FeedingPage,
   HandoverPage,
@@ -52,8 +51,6 @@ export default function App() {
           <Route path="/milk-quality" element={<QualityPage />} />
           <Route path="/finished-quality" element={<QualityPage />} />
           <Route path="/work-orders" element={<WorkOrdersPage />} />
-          <Route path="/contracts" element={<ContractsPage />} />
-          <Route path="/reports" element={<ExceptionReportPage />} />
           <Route path="/exceptions" element={<ExceptionReportPage />} />
           <Route path="/exception-reports" element={<ExceptionReportPage />} />
           <Route path="/handover" element={<HandoverPage />} />
@@ -79,7 +76,6 @@ export default function App() {
           <Route path="/settings" element={<Navigate to="/profile" replace />} />
           <Route path="/data-tools" element={<Navigate to="/profile" replace />} />
           <Route path="*" element={<Navigate to="/app" replace />} />
-          <Route path="/contracts" element={<ContractsPage />} />
         </Route>
       </Routes>
     </DemoProvider>

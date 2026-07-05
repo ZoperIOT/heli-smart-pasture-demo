@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle, Bell, BookOpen, Boxes, CheckCircle2, ClipboardList, Database, FileCheck2, FileText, HeartHandshake, HeartPulse, Milk, PackageCheck, Search, Send, UserRound, UsersRound, Wheat } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDemo } from "../../context/DemoContext.jsx";
 import {
   Field,
@@ -101,6 +101,121 @@ export function MobileHomePage() {
   const data = demo.data;
   const user = demo.currentUser || {};
   const [activeAction, setActiveAction] = useState(null);
+  const [contracts, setContracts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("heli_contracts");
+      if (saved) return JSON.parse(saved);
+    } catch (error) {
+      console.warn("读取合同缓存失败", error);
+    }
+
+    return [
+      {
+        id: "HT-2026-001",
+        name: "青贮饲料采购合同",
+        type: "采购合同",
+        party: "青岛某饲料供应商",
+        amount: "120000",
+        signDate: today(),
+        deadline: "2026-08-31",
+        status: "履约中",
+        owner: user.name || "刘师傅",
+        remark: "7月批次饲料采购合同"
+      },
+      {
+        id: "HT-2026-002",
+        name: "设备维保服务合同",
+        type: "服务合同",
+        party: "自动饲喂设备服务商",
+        amount: "36000",
+        signDate: today(),
+        deadline: "2026-07-30",
+        status: "即将到期",
+        owner: user.name || "刘师傅",
+        remark: "饲喂设备年度维保"
+      }
+    ];
+  });
+
+  const [contractForm, setContractForm] = useState({
+    name: "",
+    type: "采购合同",
+    party: "",
+    amount: "",
+    signDate: today(),
+    deadline: today(),
+    status: "待审核",
+    remark: ""
+  });
+
+  useEffect(() => {
+    localStorage.setItem("heli_contracts", JSON.stringify(contracts));
+  }, [contracts]);
+
+  const myContracts = contracts.filter((item) => {
+    if (demo.mobileRole === "管理员") return true;
+    return item.owner === user.name;
+  });
+
+  const submitContract = () => {
+    if (demo.isReadonly) {
+      window.alert("当前为只读演示模式，不能执行该操作。");
+      return;
+    }
+
+    if (!contractForm.name.trim()) {
+      window.alert("请输入合同名称");
+      return;
+    }
+
+    if (!contractForm.party.trim()) {
+      window.alert("请输入合同相对方");
+      return;
+    }
+
+    const newContract = {
+      ...contractForm,
+      id: `HT-${Date.now()}`,
+      owner: user.name || "刘师傅"
+    };
+
+    setContracts((prev) => [newContract, ...prev]);
+
+    setContractForm({
+      name: "",
+      type: "采购合同",
+      party: "",
+      amount: "",
+      signDate: today(),
+      deadline: today(),
+      status: "待审核",
+      remark: ""
+    });
+
+    window.alert("合同已添加。");
+  };
+
+  const updateContractStatus = (id, status) => {
+    if (demo.isReadonly) {
+      window.alert("当前为只读演示模式，不能执行该操作。");
+      return;
+    }
+
+    setContracts((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status } : item))
+    );
+  };
+
+  const deleteContract = (id) => {
+    if (demo.isReadonly) {
+      window.alert("当前为只读演示模式，不能执行该操作。");
+      return;
+    }
+
+    if (!window.confirm("确定删除这份合同吗？")) return;
+
+    setContracts((prev) => prev.filter((item) => item.id !== id));
+  };
   const [feedingForm, setFeedingForm] = useState({ date: today(), shift: "早", barn: "A区泌乳牛舍", herd: "泌乳高峰群", formula: "泌乳高峰日粮", feedBatch: "FD-N-20260704", plannedAmount: 8.5, actualAmount: 8.5, leftoverAmount: 0.4, dryMatterRatio: 0.52, intakeStatus: "正常", autoDeduct: true, abnormalNote: "", remark: "" });
   const [milkForm, setMilkForm] = useState({ date: today(), shift: "早班", barn: "A区泌乳牛舍", herd: "泌乳高峰群", milkingCowCount: 260, totalMilk: 8.6, qualifiedMilk: 8.4, abnormalMilk: 0.2, tankNo: "1号奶罐", temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", sendInspection: true, abnormalNote: "", remark: "" });
   const [breedingForm, setBreedingForm] = useState({ recordType: "发情观察", cattleCode: "HL-N-1028", barn: "A区泌乳牛舍", observedAt: nowTime(), symptom: "爬跨、鸣叫", pregnancyResult: "待复查", nextReminderDate: today(), owner: user.name || "刘师傅", remark: "" });
@@ -133,6 +248,7 @@ export function MobileHomePage() {
     { action: "breeding", icon: HeartPulse, title: "繁育记录", desc: "记录发情、配种、妊检、产犊", tone: "rose" },
     { action: "cattle", icon: Search, title: "牛只管理", desc: "查牛号、转群、上报牛只异常", tone: "amber" },
     { action: "inventory", icon: Boxes, title: "库存申请", desc: "领料、入库、出库、盘点", tone: "violet" },
+    { action: "contract", icon: FileText, title: "合同管理", desc: "添加合同、管理自己的合同", tone: "violet" },
     { action: "quality", icon: PackageCheck, title: "质检记录", desc: "原奶、饲料、成品质检", tone: "emerald" },
     { action: "exception", icon: AlertTriangle, title: "异常上报", desc: "上报牛只、饲喂、库存异常", tone: "rose" },
     { action: "handover", icon: HeartHandshake, title: "交接班", desc: "提交未完成事项和重点观察", tone: "sky" }
@@ -141,7 +257,6 @@ export function MobileHomePage() {
     { to: "/work-orders", icon: Send, title: "工单派发", desc: "创建并分配员工工单", tone: "emerald" },
     { to: "/work-orders", icon: FileCheck2, title: "工单审核", desc: "复核员工提交结果", tone: "amber" },
     { to: "/records", icon: UsersRound, title: "员工记录", desc: "查看全部员工提交", tone: "sky" },
-    { to: "/contracts", icon: FileText, title: "合同管理", desc: "采购、销售、服务合同台账", tone: "violet" },
     { to: "/profile", icon: Database, title: "基础数据", desc: "维护牛舍、物料、员工资料", tone: "slate" }
   ];
   const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
@@ -258,6 +373,166 @@ export function MobileHomePage() {
         </div>
       </SectionCard>
 
+      <MobileFormSheet
+        open={activeAction === "contract"}
+        title="合同管理"
+        description="添加采购、销售、服务合同，并管理自己负责的合同台账。"
+        onClose={() => setActiveAction(null)}
+        onSubmit={submitContract}
+        submitText="添加合同"
+        draftText="关闭"
+        onSaveDraft={() => setActiveAction(null)}
+      >
+        <div className="space-y-4">
+          <SectionCard title="新增合同" desc="当前为前端演示数据，会暂存在浏览器本地。">
+            <div className="space-y-3">
+              <Field label="合同名称">
+                <TextInput
+                  value={contractForm.name}
+                  onChange={(e) => setContractForm({ ...contractForm, name: e.target.value })}
+                  placeholder="例如：青贮饲料采购合同"
+                />
+              </Field>
+
+              <Field label="合同类型">
+                <SelectInput
+                  value={contractForm.type}
+                  onChange={(e) => setContractForm({ ...contractForm, type: e.target.value })}
+                >
+                  {["采购合同", "销售合同", "服务合同", "租赁合同", "其他合同"].map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+
+              <Field label="合同相对方">
+                <TextInput
+                  value={contractForm.party}
+                  onChange={(e) => setContractForm({ ...contractForm, party: e.target.value })}
+                  placeholder="例如：某饲料供应商 / 某乳品客户"
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="合同金额">
+                  <TextInput
+                    type="number"
+                    value={contractForm.amount}
+                    onChange={(e) => setContractForm({ ...contractForm, amount: e.target.value })}
+                    placeholder="金额"
+                  />
+                </Field>
+
+                <Field label="合同状态">
+                  <SelectInput
+                    value={contractForm.status}
+                    onChange={(e) => setContractForm({ ...contractForm, status: e.target.value })}
+                  >
+                    {["待审核", "履约中", "即将到期", "已完成", "已终止"].map((item) => (
+                      <option key={item}>{item}</option>
+                    ))}
+                  </SelectInput>
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="签订日期">
+                  <TextInput
+                    type="date"
+                    value={contractForm.signDate}
+                    onChange={(e) => setContractForm({ ...contractForm, signDate: e.target.value })}
+                  />
+                </Field>
+
+                <Field label="到期日期">
+                  <TextInput
+                    type="date"
+                    value={contractForm.deadline}
+                    onChange={(e) => setContractForm({ ...contractForm, deadline: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <Field label="备注">
+                <TextArea
+                  value={contractForm.remark}
+                  onChange={(e) => setContractForm({ ...contractForm, remark: e.target.value })}
+                  placeholder="例如：付款节点、供货周期、注意事项等"
+                />
+              </Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="我的合同" desc={demo.mobileRole === "管理员" ? "管理员可查看全部合同。" : "员工仅查看自己添加的合同。"}>
+            <div className="space-y-3">
+              {myContracts.map((contract) => (
+                <div
+                  key={contract.id}
+                  className="rounded-[8px] bg-slate-50 p-3 ring-1 ring-slate-100"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-900">
+                        {contract.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {contract.type} · {contract.party}
+                      </p>
+                    </div>
+                    <StatusTag status={contract.status} />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                    <p>金额：¥{contract.amount || "0"}</p>
+                    <p>负责人：{contract.owner}</p>
+                    <p>签订：{contract.signDate}</p>
+                    <p>到期：{contract.deadline}</p>
+                  </div>
+
+                  {contract.remark && (
+                    <p className="mt-2 rounded-[8px] bg-white p-2 text-xs leading-5 text-slate-500">
+                      {contract.remark}
+                    </p>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateContractStatus(contract.id, "履约中")}
+                      className="min-h-10 rounded-[8px] bg-emerald-50 text-xs font-black text-emerald-700"
+                    >
+                      履约中
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateContractStatus(contract.id, "已完成")}
+                      className="min-h-10 rounded-[8px] bg-sky-50 text-xs font-black text-sky-700"
+                    >
+                      已完成
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteContract(contract.id)}
+                      className="min-h-10 rounded-[8px] bg-red-50 text-xs font-black text-red-700"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!myContracts.length && (
+                <EmptyState
+                  title="暂无合同"
+                  desc="添加合同后，会显示在这里。"
+                />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+      </MobileFormSheet>
       <MobileFormSheet open={activeAction === "feeding"} title="饲喂记录" description="填写投喂量、剩料和采食情况。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("饲喂管理", `${feedingForm.barn}${feedingForm.shift}班饲喂`, feedingForm)} onSubmit={() => submitSheet("feeding")} submitText="提交饲喂记录">
         <div className="grid gap-3">
           <Field label="日期"><TextInput value={feedingForm.date} onChange={(e) => setFeedingForm({ ...feedingForm, date: e.target.value })} /></Field>
@@ -1149,77 +1424,6 @@ export function RecordsPage() {
   );
 }
 
-export function ContractsPage() {
-  const contracts = [
-    {
-      id: "HT-2026-001",
-      name: "青贮饲料采购合同",
-      party: "青岛某饲料供应商",
-      amount: "¥120,000",
-      status: "履约中",
-      deadline: "2026-08-31"
-    },
-    {
-      id: "HT-2026-002",
-      name: "原奶销售合同",
-      party: "欧力菲德乳品厂",
-      amount: "¥260,000",
-      status: "待复核",
-      deadline: "2026-09-15"
-    },
-    {
-      id: "HT-2026-003",
-      name: "设备维保服务合同",
-      party: "自动饲喂设备服务商",
-      amount: "¥36,000",
-      status: "即将到期",
-      deadline: "2026-07-30"
-    }
-  ];
-
-  return (
-    <div className="space-y-4">
-      <PageTitle
-        title="合同管理"
-        desc="查看采购、销售、服务合同的履约状态和到期提醒"
-      />
-
-      <SectionCard title="合同台账" desc="当前为前端演示数据，后续可接入后端合同接口">
-        <div className="space-y-3">
-          {contracts.map((contract) => (
-            <div
-              key={contract.id}
-              className="rounded-[8px] bg-slate-50 p-3 ring-1 ring-slate-100"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {contract.name}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {contract.id} · {contract.party}
-                  </p>
-                </div>
-                <StatusTag status={contract.status} />
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                <div>
-                  <span className="text-slate-400">合同金额：</span>
-                  {contract.amount}
-                </div>
-                <div>
-                  <span className="text-slate-400">到期时间：</span>
-                  {contract.deadline}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
 
 export function ProfilePage() {
   const demo = useDemo();
