@@ -10,6 +10,7 @@ import {
   EmptyState,
   MessageCard,
   MiniStat,
+  MobileFormSheet,
   OperationManualCard,
   PageTitle,
   QuickActionGrid,
@@ -66,7 +67,7 @@ function calcMilk(form) {
   };
 }
 
-function QuickLink({ to, icon: Icon, title, desc, tone = "emerald" }) {
+function QuickLink({ to, onClick, icon: Icon, title, desc, tone = "emerald" }) {
   const tones = {
     emerald: "bg-emerald-50 text-emerald-700",
     sky: "bg-sky-50 text-sky-700",
@@ -75,15 +76,18 @@ function QuickLink({ to, icon: Icon, title, desc, tone = "emerald" }) {
     violet: "bg-violet-50 text-violet-700",
     slate: "bg-slate-100 text-slate-700"
   };
-  return (
-    <Link to={to} className="min-h-36 rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100 active:scale-[0.99]">
+  const className = "min-h-36 rounded-[8px] bg-white p-4 text-left shadow-sm ring-1 ring-slate-100 active:scale-[0.99]";
+  const content = (
+    <>
       <span className={`grid h-14 w-14 place-items-center rounded-[8px] ${tones[tone] || tones.emerald}`}>
         <Icon size={29} />
       </span>
       <p className="mt-3 text-lg font-black text-slate-950">{title}</p>
       <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{desc}</p>
-    </Link>
+    </>
   );
+  if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>;
+  return <Link to={to} className={className}>{content}</Link>;
 }
 
 function visibleForUser(list, demo, ownerKeys = ["assignee", "owner", "handler", "createdBy", "receiver"]) {
@@ -96,6 +100,15 @@ export function MobileHomePage() {
   const demo = useDemo();
   const data = demo.data;
   const user = demo.currentUser || {};
+  const [activeAction, setActiveAction] = useState(null);
+  const [feedingForm, setFeedingForm] = useState({ date: today(), shift: "早", barn: "A区泌乳牛舍", herd: "泌乳高峰群", formula: "泌乳高峰日粮", feedBatch: "FD-N-20260704", plannedAmount: 8.5, actualAmount: 8.5, leftoverAmount: 0.4, dryMatterRatio: 0.52, intakeStatus: "正常", autoDeduct: true, abnormalNote: "", remark: "" });
+  const [milkForm, setMilkForm] = useState({ date: today(), shift: "早班", barn: "A区泌乳牛舍", herd: "泌乳高峰群", milkingCowCount: 260, totalMilk: 8.6, qualifiedMilk: 8.4, abnormalMilk: 0.2, tankNo: "1号奶罐", temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", sendInspection: true, abnormalNote: "", remark: "" });
+  const [breedingForm, setBreedingForm] = useState({ recordType: "发情观察", cattleCode: "HL-N-1028", barn: "A区泌乳牛舍", observedAt: nowTime(), symptom: "爬跨、鸣叫", pregnancyResult: "待复查", nextReminderDate: today(), owner: user.name || "刘师傅", remark: "" });
+  const [cattleForm, setCattleForm] = useState({ cattleCode: "HL-N-1028", type: "疾病", currentBarn: "A区泌乳牛舍", targetBarn: "", method: "现场复查并记录处理结果", affectMilk: true, withdrawalDays: 3, remark: "" });
+  const [inventoryForm, setInventoryForm] = useState({ actionType: "领料申请", materialType: "饲料", materialName: "奶牛精补料", batch: "FD-N-20260704", quantity: 2, unit: "吨", purpose: "晚班饲喂备用", urgent: false, remark: "" });
+  const [qualityForm, setQualityForm] = useState({ sampleType: "原奶", batch: "HL-MILK-AM", sampledAt: nowTime(), testItems: "温度、蛋白、脂肪、体细胞、菌落", result: "合格", passed: true, reason: "", handleMethod: "隔离", remark: "" });
+  const [exceptionForm, setExceptionForm] = useState({ exceptionType: "牛只异常", location: "A区泌乳牛舍", relatedObject: "HL-N-1028", urgency: "重要", description: "采食下降，需要现场复核。", photo: "图片上传占位", remark: "" });
+  const [handoverForm, setHandoverForm] = useState({ fromUser: user.name || "刘师傅", toUser: "赵师傅", shift: "早班", unfinishedItems: "A区泌乳牛舍剩料复核", abnormalCattle: "HL-N-1028 继续观察", abnormalInventory: "无", focusCattle: "HL-N-1028", confirmed: true, remark: "" });
   const tasks = visibleForUser(data.mobileTasks, demo);
   const openStatuses = ["待派发", "待处理", "处理中", "待复核", "已驳回", "已超时", "未开始", "进行中"];
   const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => openStatuses.includes(item.status));
@@ -115,14 +128,14 @@ export function MobileHomePage() {
     ...workOrders.filter((item) => item.source === "exception" || item.source === "quality" || String(item.type || "").includes("异常"))
   ].filter((item) => demo.mobileRole === "管理员" || item.handler === user.name || item.createdBy === user.name || item.reporter === user.name).length;
   const actionItems = [
-    { to: "/feeding", icon: Wheat, title: "饲喂记录", desc: "填写投喂量、剩料、采食情况", tone: "emerald" },
-    { to: "/milk", icon: Milk, title: "产奶记录", desc: "录入班次产奶量和异常奶", tone: "sky" },
-    { to: "/breeding", icon: HeartPulse, title: "繁育记录", desc: "记录发情、配种、妊检、产犊", tone: "rose" },
-    { to: "/cattle", icon: Search, title: "牛只管理", desc: "查牛号、转群、上报牛只异常", tone: "amber" },
-    { to: "/inventory", icon: Boxes, title: "库存申请", desc: "领料、入库、出库、盘点", tone: "violet" },
-    { to: "/quality", icon: PackageCheck, title: "质检记录", desc: "原奶、饲料、成品质检", tone: "emerald" },
-    { to: "/reports", icon: AlertTriangle, title: "异常上报", desc: "上报牛只、饲喂、库存异常", tone: "rose" },
-    { to: "/handover", icon: HeartHandshake, title: "交接班", desc: "提交未完成事项和重点观察", tone: "sky" }
+    { action: "feeding", icon: Wheat, title: "饲喂记录", desc: "填写投喂量、剩料、采食情况", tone: "emerald" },
+    { action: "milk", icon: Milk, title: "产奶记录", desc: "录入班次产奶量和异常奶", tone: "sky" },
+    { action: "breeding", icon: HeartPulse, title: "繁育记录", desc: "记录发情、配种、妊检、产犊", tone: "rose" },
+    { action: "cattle", icon: Search, title: "牛只管理", desc: "查牛号、转群、上报牛只异常", tone: "amber" },
+    { action: "inventory", icon: Boxes, title: "库存申请", desc: "领料、入库、出库、盘点", tone: "violet" },
+    { action: "quality", icon: PackageCheck, title: "质检记录", desc: "原奶、饲料、成品质检", tone: "emerald" },
+    { action: "exception", icon: AlertTriangle, title: "异常上报", desc: "上报牛只、饲喂、库存异常", tone: "rose" },
+    { action: "handover", icon: HeartHandshake, title: "交接班", desc: "提交未完成事项和重点观察", tone: "sky" }
   ];
   const adminItems = [
     { to: "/work-orders", icon: Send, title: "工单派发", desc: "创建并分配员工工单", tone: "emerald" },
@@ -131,6 +144,36 @@ export function MobileHomePage() {
     { to: "/profile", icon: Database, title: "基础数据", desc: "维护牛舍、物料、员工资料", tone: "slate" }
   ];
   const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
+  const feedCalc = calcFeeding(feedingForm);
+  const milkCalc = calcMilk(milkForm);
+  const submitSheet = (action) => {
+    try {
+      if (action === "feeding") demo.submitFeedingRecord({ ...feedingForm, executor: user.name, abnormalNote: feedingForm.abnormalNote });
+      if (action === "milk") demo.submitMilkRecord({ ...milkForm, milker: user.name, abnormalDescription: milkForm.abnormalNote });
+      if (action === "breeding") demo.submitBreedingRecord({ ...breedingForm, recordTime: breedingForm.observedAt, pregnancyCheckDate: breedingForm.nextReminderDate });
+      if (action === "cattle") demo.submitCattleEvent({ ...cattleForm, eventTime: nowTime(), handler: user.name, affectMilk: cattleForm.affectMilk });
+      if (action === "inventory") {
+        const kindMap = { 领料申请: "request", 入库登记: "in", 出库登记: "out", 盘点记录: "count" };
+        demo.submitInventoryAction(kindMap[inventoryForm.actionType] || "request", { ...inventoryForm, applicant: user.name, handler: user.name });
+      }
+      if (action === "quality") demo.submitQualityInspection({ ...qualityForm, inspectionType: `${qualityForm.sampleType}质检`, taskId: "quality-task-1", inspector: user.name });
+      if (action === "exception") demo.submitExceptionReport({ ...exceptionForm, reporter: user.name });
+      if (action === "handover") demo.submitShiftHandover({ ...handoverForm, handoverAt: nowTime(), abnormalQuality: "", notes: handoverForm.remark });
+      setActiveAction(null);
+      window.alert("已提交，系统已写入记录并触发相关联动。");
+    } catch (error) {
+      window.alert(error.message || "提交失败");
+    }
+  };
+  const saveSheetDraft = (module, title, payload) => {
+    try {
+      demo.saveDraft(module, title, payload);
+      setActiveAction(null);
+      window.alert("已保存到草稿箱。");
+    } catch (error) {
+      window.alert(error.message || "保存失败");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -178,7 +221,8 @@ export function MobileHomePage() {
 
       <SectionCard title="快捷操作" desc="常用业务一键进入">
         <QuickActionGrid>
-          {[...actionItems, ...(demo.mobileRole === "管理员" ? adminItems : [])].map((item) => <QuickLink key={item.title} {...item} />)}
+          {actionItems.map((item) => <QuickLink key={item.title} {...item} onClick={() => setActiveAction(item.action)} />)}
+          {demo.mobileRole === "管理员" && adminItems.map((item) => <QuickLink key={item.title} {...item} />)}
         </QuickActionGrid>
       </SectionCard>
 
@@ -212,6 +256,147 @@ export function MobileHomePage() {
           {!myRecords.length && <EmptyState title="暂无提交记录" desc="完成业务提交后会显示最近记录。" />}
         </div>
       </SectionCard>
+
+      <MobileFormSheet open={activeAction === "feeding"} title="饲喂记录" description="填写投喂量、剩料和采食情况。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("饲喂管理", `${feedingForm.barn}${feedingForm.shift}班饲喂`, feedingForm)} onSubmit={() => submitSheet("feeding")} submitText="提交饲喂记录">
+        <div className="grid gap-3">
+          <Field label="日期"><TextInput value={feedingForm.date} onChange={(e) => setFeedingForm({ ...feedingForm, date: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="班次"><SelectInput value={feedingForm.shift} onChange={(e) => setFeedingForm({ ...feedingForm, shift: e.target.value })}>{["早", "中", "晚", "夜"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            <Field label="采食情况"><SelectInput value={feedingForm.intakeStatus} onChange={(e) => setFeedingForm({ ...feedingForm, intakeStatus: e.target.value })}>{["正常", "偏低", "拒食", "异常"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          </div>
+          <Field label="牛舍"><TextInput value={feedingForm.barn} onChange={(e) => setFeedingForm({ ...feedingForm, barn: e.target.value })} /></Field>
+          <Field label="牛群"><TextInput value={feedingForm.herd} onChange={(e) => setFeedingForm({ ...feedingForm, herd: e.target.value })} /></Field>
+          <Field label="饲喂配方"><TextInput value={feedingForm.formula} onChange={(e) => setFeedingForm({ ...feedingForm, formula: e.target.value })} /></Field>
+          <Field label="饲料批次"><TextInput value={feedingForm.feedBatch} onChange={(e) => setFeedingForm({ ...feedingForm, feedBatch: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="计划投喂量"><TextInput value={feedingForm.plannedAmount} onChange={(e) => setFeedingForm({ ...feedingForm, plannedAmount: e.target.value })} /></Field>
+            <Field label="实际投喂量"><TextInput value={feedingForm.actualAmount} onChange={(e) => setFeedingForm({ ...feedingForm, actualAmount: e.target.value })} /></Field>
+            <Field label="剩料量"><TextInput value={feedingForm.leftoverAmount} onChange={(e) => setFeedingForm({ ...feedingForm, leftoverAmount: e.target.value })} /></Field>
+            <Field label="干物质比例"><TextInput value={feedingForm.dryMatterRatio} onChange={(e) => setFeedingForm({ ...feedingForm, dryMatterRatio: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="偏差率" value={`${feedCalc.deviationRate}%`} tone="amber" />
+            <MiniStat label="剩料率" value={`${feedCalc.leftoverRate}%`} tone="amber" />
+            <MiniStat label="干物质采食" value={feedCalc.dryMatterIntake} />
+          </div>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={feedingForm.autoDeduct} onChange={(e) => setFeedingForm({ ...feedingForm, autoDeduct: e.target.checked })} />自动扣减库存</label>
+          <Field label="异常说明"><TextArea value={feedingForm.abnormalNote} onChange={(e) => setFeedingForm({ ...feedingForm, abnormalNote: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={feedingForm.remark} onChange={(e) => setFeedingForm({ ...feedingForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "milk"} title="产奶记录" description="录入班次产奶量、异常奶和质量指标。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("产奶管理", `${milkForm.barn}${milkForm.shift}产奶`, milkForm)} onSubmit={() => submitSheet("milk")} submitText="提交产奶记录">
+        <div className="grid gap-3">
+          <Field label="日期"><TextInput value={milkForm.date} onChange={(e) => setMilkForm({ ...milkForm, date: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="班次"><SelectInput value={milkForm.shift} onChange={(e) => setMilkForm({ ...milkForm, shift: e.target.value })}>{["早班", "中班", "晚班"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+            <Field label="泌乳牛头数"><TextInput value={milkForm.milkingCowCount} onChange={(e) => setMilkForm({ ...milkForm, milkingCowCount: e.target.value })} /></Field>
+          </div>
+          <Field label="牛舍"><TextInput value={milkForm.barn} onChange={(e) => setMilkForm({ ...milkForm, barn: e.target.value })} /></Field>
+          <Field label="牛群"><TextInput value={milkForm.herd} onChange={(e) => setMilkForm({ ...milkForm, herd: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="总产奶量"><TextInput value={milkForm.totalMilk} onChange={(e) => setMilkForm({ ...milkForm, totalMilk: e.target.value })} /></Field>
+            <Field label="合格奶量"><TextInput value={milkForm.qualifiedMilk} onChange={(e) => setMilkForm({ ...milkForm, qualifiedMilk: e.target.value })} /></Field>
+            <Field label="异常奶量"><TextInput value={milkForm.abnormalMilk} onChange={(e) => setMilkForm({ ...milkForm, abnormalMilk: e.target.value })} /></Field>
+            <Field label="入罐编号"><TextInput value={milkForm.tankNo} onChange={(e) => setMilkForm({ ...milkForm, tankNo: e.target.value })} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2"><MiniStat label="单牛平均" value={milkCalc.avgMilkPerCow} /><MiniStat label="异常奶比例" value={`${milkCalc.abnormalMilkRate}%`} tone="amber" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="原奶温度"><TextInput value={milkForm.temperature} onChange={(e) => setMilkForm({ ...milkForm, temperature: e.target.value })} /></Field>
+            <Field label="蛋白"><TextInput value={milkForm.protein} onChange={(e) => setMilkForm({ ...milkForm, protein: e.target.value })} /></Field>
+            <Field label="脂肪"><TextInput value={milkForm.fat} onChange={(e) => setMilkForm({ ...milkForm, fat: e.target.value })} /></Field>
+            <Field label="体细胞"><TextInput value={milkForm.somaticCell} onChange={(e) => setMilkForm({ ...milkForm, somaticCell: e.target.value })} /></Field>
+          </div>
+          <Field label="菌落总数"><TextInput value={milkForm.colony} onChange={(e) => setMilkForm({ ...milkForm, colony: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={milkForm.sendInspection} onChange={(e) => setMilkForm({ ...milkForm, sendInspection: e.target.checked })} />是否送检</label>
+          <Field label="异常说明"><TextArea value={milkForm.abnormalNote} onChange={(e) => setMilkForm({ ...milkForm, abnormalNote: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={milkForm.remark} onChange={(e) => setMilkForm({ ...milkForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "breeding"} title="繁育记录" description="记录发情、配种、妊检或产犊。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("繁育管理", `${breedingForm.cattleCode}${breedingForm.recordType}`, breedingForm)} onSubmit={() => submitSheet("breeding")} submitText="提交繁育记录">
+        <div className="grid gap-3">
+          <Field label="记录类型"><SelectInput value={breedingForm.recordType} onChange={(e) => setBreedingForm({ ...breedingForm, recordType: e.target.value })}>{["发情观察", "配种", "妊检", "产犊"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="牛号"><TextInput value={breedingForm.cattleCode} onChange={(e) => setBreedingForm({ ...breedingForm, cattleCode: e.target.value })} /></Field>
+          <Field label="牛舍"><TextInput value={breedingForm.barn} onChange={(e) => setBreedingForm({ ...breedingForm, barn: e.target.value })} /></Field>
+          <Field label="记录时间"><TextInput value={breedingForm.observedAt} onChange={(e) => setBreedingForm({ ...breedingForm, observedAt: e.target.value })} /></Field>
+          <Field label="相关结果"><TextArea value={breedingForm.symptom} onChange={(e) => setBreedingForm({ ...breedingForm, symptom: e.target.value })} /></Field>
+          <Field label="下次提醒日期"><TextInput value={breedingForm.nextReminderDate} onChange={(e) => setBreedingForm({ ...breedingForm, nextReminderDate: e.target.value })} /></Field>
+          <Field label="操作人"><TextInput value={breedingForm.owner} onChange={(e) => setBreedingForm({ ...breedingForm, owner: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={breedingForm.remark} onChange={(e) => setBreedingForm({ ...breedingForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "cattle"} title="牛只事件" description="记录转群、疾病、用药、防疫等现场事件。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("牛只管理", `${cattleForm.cattleCode}${cattleForm.type}`, cattleForm)} onSubmit={() => submitSheet("cattle")} submitText="提交牛只事件">
+        <div className="grid gap-3">
+          <Field label="牛号"><TextInput value={cattleForm.cattleCode} onChange={(e) => setCattleForm({ ...cattleForm, cattleCode: e.target.value })} /></Field>
+          <Field label="事件类型"><SelectInput value={cattleForm.type} onChange={(e) => setCattleForm({ ...cattleForm, type: e.target.value })}>{["转群", "疾病", "用药", "防疫", "淘汰", "死亡", "异常行为", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="当前牛舍"><TextInput value={cattleForm.currentBarn} onChange={(e) => setCattleForm({ ...cattleForm, currentBarn: e.target.value })} /></Field>
+          {cattleForm.type === "转群" && <Field label="目标牛舍"><TextInput value={cattleForm.targetBarn} onChange={(e) => setCattleForm({ ...cattleForm, targetBarn: e.target.value })} /></Field>}
+          <Field label="处理方式"><TextArea value={cattleForm.method} onChange={(e) => setCattleForm({ ...cattleForm, method: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={cattleForm.affectMilk} onChange={(e) => setCattleForm({ ...cattleForm, affectMilk: e.target.checked })} />是否影响产奶</label>
+          {cattleForm.type === "用药" && <Field label="休药期天数"><TextInput value={cattleForm.withdrawalDays} onChange={(e) => setCattleForm({ ...cattleForm, withdrawalDays: e.target.value })} /></Field>}
+          <Field label="备注"><TextArea value={cattleForm.remark} onChange={(e) => setCattleForm({ ...cattleForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "inventory"} title="库存申请" description="提交领料、入库、出库或盘点记录。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("库存管理", `${inventoryForm.materialName}${inventoryForm.actionType}`, inventoryForm)} onSubmit={() => submitSheet("inventory")} submitText="提交库存记录">
+        <div className="grid gap-3">
+          <Field label="类型"><SelectInput value={inventoryForm.actionType} onChange={(e) => setInventoryForm({ ...inventoryForm, actionType: e.target.value })}>{["领料申请", "入库登记", "出库登记", "盘点记录"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="物料类型"><TextInput value={inventoryForm.materialType} onChange={(e) => setInventoryForm({ ...inventoryForm, materialType: e.target.value })} /></Field>
+            <Field label="单位"><TextInput value={inventoryForm.unit} onChange={(e) => setInventoryForm({ ...inventoryForm, unit: e.target.value })} /></Field>
+          </div>
+          <Field label="物料名称"><TextInput value={inventoryForm.materialName} onChange={(e) => setInventoryForm({ ...inventoryForm, materialName: e.target.value })} /></Field>
+          <Field label="批次号"><TextInput value={inventoryForm.batch} onChange={(e) => setInventoryForm({ ...inventoryForm, batch: e.target.value })} /></Field>
+          <Field label="数量"><TextInput value={inventoryForm.quantity} onChange={(e) => setInventoryForm({ ...inventoryForm, quantity: e.target.value })} /></Field>
+          <Field label="用途"><TextArea value={inventoryForm.purpose} onChange={(e) => setInventoryForm({ ...inventoryForm, purpose: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={inventoryForm.urgent} onChange={(e) => setInventoryForm({ ...inventoryForm, urgent: e.target.checked })} />是否紧急</label>
+          <Field label="备注"><TextArea value={inventoryForm.remark} onChange={(e) => setInventoryForm({ ...inventoryForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "quality"} title="质检记录" description="记录原奶、饲料或成品质检结果。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("质检管理", `${qualityForm.batch}${qualityForm.sampleType}质检`, qualityForm)} onSubmit={() => submitSheet("quality")} submitText="提交质检记录">
+        <div className="grid gap-3">
+          <Field label="样品类型"><SelectInput value={qualityForm.sampleType} onChange={(e) => setQualityForm({ ...qualityForm, sampleType: e.target.value })}>{["原奶", "饲料", "成品"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="关联批次"><TextInput value={qualityForm.batch} onChange={(e) => setQualityForm({ ...qualityForm, batch: e.target.value })} /></Field>
+          <Field label="采样时间"><TextInput value={qualityForm.sampledAt} onChange={(e) => setQualityForm({ ...qualityForm, sampledAt: e.target.value })} /></Field>
+          <Field label="检测项目"><TextArea value={qualityForm.testItems} onChange={(e) => setQualityForm({ ...qualityForm, testItems: e.target.value })} /></Field>
+          <Field label="检测结果"><SelectInput value={qualityForm.result} onChange={(e) => setQualityForm({ ...qualityForm, result: e.target.value, passed: e.target.value === "合格" })}>{["合格", "不合格"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={qualityForm.passed} onChange={(e) => setQualityForm({ ...qualityForm, passed: e.target.checked, result: e.target.checked ? "合格" : "不合格" })} />是否合格</label>
+          <Field label="不合格原因"><TextArea value={qualityForm.reason} onChange={(e) => setQualityForm({ ...qualityForm, reason: e.target.value })} /></Field>
+          <Field label="处理方式"><SelectInput value={qualityForm.handleMethod} onChange={(e) => setQualityForm({ ...qualityForm, handleMethod: e.target.value })}>{["隔离", "退回", "报废", "复检", "降级使用"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="备注"><TextArea value={qualityForm.remark} onChange={(e) => setQualityForm({ ...qualityForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "exception"} title="异常上报" description="提交后会自动生成工单和消息。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("异常上报", `${exceptionForm.exceptionType}${exceptionForm.location}`, exceptionForm)} onSubmit={() => submitSheet("exception")} submitText="提交异常">
+        <div className="grid gap-3">
+          <Field label="异常类型"><SelectInput value={exceptionForm.exceptionType} onChange={(e) => setExceptionForm({ ...exceptionForm, exceptionType: e.target.value })}>{["牛只异常", "饲喂异常", "产奶异常", "质检异常", "库存异常", "设备异常", "安全隐患", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="所属位置"><TextInput value={exceptionForm.location} onChange={(e) => setExceptionForm({ ...exceptionForm, location: e.target.value })} /></Field>
+          <Field label="关联对象"><TextInput value={exceptionForm.relatedObject} onChange={(e) => setExceptionForm({ ...exceptionForm, relatedObject: e.target.value })} /></Field>
+          <Field label="紧急程度"><SelectInput value={exceptionForm.urgency} onChange={(e) => setExceptionForm({ ...exceptionForm, urgency: e.target.value })}>{["普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="异常描述"><TextArea value={exceptionForm.description} onChange={(e) => setExceptionForm({ ...exceptionForm, description: e.target.value })} /></Field>
+          <Field label="图片上传占位"><TextInput value={exceptionForm.photo} onChange={(e) => setExceptionForm({ ...exceptionForm, photo: e.target.value })} /></Field>
+          <Field label="备注"><TextArea value={exceptionForm.remark} onChange={(e) => setExceptionForm({ ...exceptionForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "handover"} title="交接班" description="提交未完成事项和重点观察记录。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("交接班", `${handoverForm.shift}交接班`, handoverForm)} onSubmit={() => submitSheet("handover")} submitText="提交交接班">
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="交班人"><TextInput value={handoverForm.fromUser} onChange={(e) => setHandoverForm({ ...handoverForm, fromUser: e.target.value })} /></Field>
+            <Field label="接班人"><TextInput value={handoverForm.toUser} onChange={(e) => setHandoverForm({ ...handoverForm, toUser: e.target.value })} /></Field>
+          </div>
+          <Field label="班次"><SelectInput value={handoverForm.shift} onChange={(e) => setHandoverForm({ ...handoverForm, shift: e.target.value })}>{["早班", "中班", "晚班", "夜班"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="未完成事项"><TextArea value={handoverForm.unfinishedItems} onChange={(e) => setHandoverForm({ ...handoverForm, unfinishedItems: e.target.value })} /></Field>
+          <Field label="异常牛只"><TextArea value={handoverForm.abnormalCattle} onChange={(e) => setHandoverForm({ ...handoverForm, abnormalCattle: e.target.value })} /></Field>
+          <Field label="异常库存"><TextArea value={handoverForm.abnormalInventory} onChange={(e) => setHandoverForm({ ...handoverForm, abnormalInventory: e.target.value })} /></Field>
+          <Field label="重点观察事项"><TextArea value={handoverForm.focusCattle} onChange={(e) => setHandoverForm({ ...handoverForm, focusCattle: e.target.value })} /></Field>
+          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={handoverForm.confirmed} onChange={(e) => setHandoverForm({ ...handoverForm, confirmed: e.target.checked })} />接班确认</label>
+          <Field label="备注"><TextArea value={handoverForm.remark} onChange={(e) => setHandoverForm({ ...handoverForm, remark: e.target.value })} /></Field>
+        </div>
+      </MobileFormSheet>
     </div>
   );
 }

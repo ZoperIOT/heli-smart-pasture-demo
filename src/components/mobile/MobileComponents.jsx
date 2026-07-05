@@ -147,6 +147,45 @@ export function SectionCard({ title, desc, children, action }) {
   );
 }
 
+export function MobileFormSheet({
+  open,
+  title,
+  description,
+  onClose,
+  onSubmit,
+  onSaveDraft,
+  children,
+  submitText = "提交",
+  draftText = "保存草稿",
+  cancelText = "取消"
+}) {
+  if (!open) return null;
+  const closeWithConfirm = () => {
+    if (window.confirm("确定关闭当前表单吗？未保存内容将不会保留。")) onClose?.();
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 px-3 pb-[max(10px,env(safe-area-inset-bottom))]" onClick={closeWithConfirm}>
+      <div className="mx-auto flex max-h-[85vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[18px] bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-black text-slate-950">{title}</h2>
+            {description && <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{description}</p>}
+          </div>
+          <button onClick={closeWithConfirm} className="grid h-10 w-10 place-items-center rounded-[8px] bg-slate-100 text-xl font-black text-slate-700" aria-label="关闭">×</button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {children}
+        </div>
+        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 bg-white px-4 py-3">
+          <button onClick={onClose} className="min-h-12 rounded-[8px] bg-slate-100 text-base font-black text-slate-700">{cancelText}</button>
+          <button onClick={onSaveDraft} className="min-h-12 rounded-[8px] bg-amber-50 text-base font-black text-amber-700">{draftText}</button>
+          <button onClick={onSubmit} className="min-h-12 rounded-[8px] bg-emerald-700 text-base font-black text-white">{submitText}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TaskCard({ task, action }) {
   return (
     <div className="rounded-[8px] border border-slate-100 bg-white p-4">
