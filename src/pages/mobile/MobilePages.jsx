@@ -141,6 +141,7 @@ export function MobileHomePage() {
     { to: "/work-orders", icon: Send, title: "工单派发", desc: "创建并分配员工工单", tone: "emerald" },
     { to: "/work-orders", icon: FileCheck2, title: "工单审核", desc: "复核员工提交结果", tone: "amber" },
     { to: "/records", icon: UsersRound, title: "员工记录", desc: "查看全部员工提交", tone: "sky" },
+    { to: "/contracts", icon: FileText, title: "合同管理", desc: "采购、销售、服务合同台账", tone: "violet" },
     { to: "/profile", icon: Database, title: "基础数据", desc: "维护牛舍、物料、员工资料", tone: "slate" }
   ];
   const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
@@ -1144,6 +1145,78 @@ export function RecordsPage() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+export function ContractsPage() {
+  const contracts = [
+    {
+      id: "HT-2026-001",
+      name: "青贮饲料采购合同",
+      party: "青岛某饲料供应商",
+      amount: "¥120,000",
+      status: "履约中",
+      deadline: "2026-08-31"
+    },
+    {
+      id: "HT-2026-002",
+      name: "原奶销售合同",
+      party: "欧力菲德乳品厂",
+      amount: "¥260,000",
+      status: "待复核",
+      deadline: "2026-09-15"
+    },
+    {
+      id: "HT-2026-003",
+      name: "设备维保服务合同",
+      party: "自动饲喂设备服务商",
+      amount: "¥36,000",
+      status: "即将到期",
+      deadline: "2026-07-30"
+    }
+  ];
+
+  return (
+    <div className="space-y-4">
+      <PageTitle
+        title="合同管理"
+        desc="查看采购、销售、服务合同的履约状态和到期提醒"
+      />
+
+      <SectionCard title="合同台账" desc="当前为前端演示数据，后续可接入后端合同接口">
+        <div className="space-y-3">
+          {contracts.map((contract) => (
+            <div
+              key={contract.id}
+              className="rounded-[8px] bg-slate-50 p-3 ring-1 ring-slate-100"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {contract.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {contract.id} · {contract.party}
+                  </p>
+                </div>
+                <StatusTag status={contract.status} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <span className="text-slate-400">合同金额：</span>
+                  {contract.amount}
+                </div>
+                <div>
+                  <span className="text-slate-400">到期时间：</span>
+                  {contract.deadline}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
     </div>
   );
 }
