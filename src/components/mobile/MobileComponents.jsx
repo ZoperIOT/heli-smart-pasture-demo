@@ -22,7 +22,7 @@ export function StatusTag({ status = "待处理", tone }) {
 
 export function MobileShell() {
   return (
-    <div className="min-h-screen bg-[#f5f8f6] text-slate-950">
+    <div className="min-h-screen bg-[#f6f8f7] text-slate-950">
       <MobileTopBar />
       <main className="mx-auto w-full max-w-[520px] px-4 pb-[calc(92px+env(safe-area-inset-bottom))] pt-4">
         <Outlet />
@@ -46,7 +46,7 @@ export function MobileTopBar() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-black">{user.name || "刘师傅"} · {user.role || "员工"}</p>
-          <p className="truncate text-sm font-bold text-slate-500">{user.organizationName || "合力牧业奶牛场"} · {today}</p>
+          <p className="truncate text-sm font-bold text-slate-500">{user.organizationName || "农牧业 IoT 环境监测预警与管理平台"} · {today}</p>
         </div>
         <select
           value={user.role || "员工"}
@@ -68,10 +68,10 @@ export function MobileTopBar() {
 export function BottomTabBar() {
   const tabs = [
     { to: "/app", label: "首页", icon: Home },
-    { to: "/work-orders", label: "工单", icon: ClipboardList },
+    { to: "/workbench", label: "工作台", icon: ClipboardList },
+    { to: "/work-orders", label: "工单", icon: ShieldCheck },
     { to: "/messages", label: "消息", icon: MessageCircle },
-    { to: "/records", label: "记录", icon: FileText },
-    { to: "/profile", label: "我的", icon: UserRound }
+    { to: "/records", label: "记录", icon: FileText }
   ];
   const location = useLocation();
   return (
@@ -79,7 +79,7 @@ export function BottomTabBar() {
       <div className="mx-auto grid max-w-[520px] grid-cols-5 gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const active = location.pathname === tab.to || (tab.to === "/app" && location.pathname === "/");
+          const active = location.pathname === tab.to || (tab.to === "/app" && location.pathname === "/") || (tab.to === "/workbench" && location.pathname === "/mobile-workbench");
           return (
             <NavLink key={tab.to} to={tab.to} className={`flex min-h-14 flex-col items-center justify-center rounded-[8px] text-xs font-black ${active ? "bg-emerald-700 text-white" : "text-slate-500"}`}>
               <Icon size={21} />
@@ -94,7 +94,7 @@ export function BottomTabBar() {
 
 export function SmartWorkOrderCard({ order, onStatus }) {
   return (
-    <div className="rounded-[8px] border border-slate-100 bg-white p-4">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-base font-black text-slate-950">{order.title}</p>
@@ -115,7 +115,7 @@ export function SmartWorkOrderCard({ order, onStatus }) {
 }
 
 export function QuickActionGrid({ children }) {
-  return <div className="grid grid-cols-2 gap-3">{children}</div>;
+  return <div className="grid grid-cols-2 gap-2">{children}</div>;
 }
 
 export function PageTitle({ title, desc, action }) {
@@ -123,7 +123,6 @@ export function PageTitle({ title, desc, action }) {
     <div className="mb-4 flex items-start gap-3">
       <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-black text-slate-950">{title}</h1>
-        {desc && <p className="mt-1 text-base font-semibold leading-6 text-slate-500">{desc}</p>}
       </div>
       {action}
     </div>
@@ -132,12 +131,11 @@ export function PageTitle({ title, desc, action }) {
 
 export function SectionCard({ title, desc, children, action }) {
   return (
-    <section className="mb-4 rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <section className="mb-4 rounded-[8px] border border-slate-300 bg-white p-4 shadow-md ring-1 ring-slate-200">
       {(title || action) && (
         <div className="mb-3 flex items-center gap-3">
           <div className="min-w-0 flex-1">
             {title && <h2 className="text-lg font-black text-slate-950">{title}</h2>}
-            {desc && <p className="text-sm font-semibold text-slate-500">{desc}</p>}
           </div>
           {action}
         </div>
@@ -169,7 +167,6 @@ export function MobileFormSheet({
         <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-4">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-black text-slate-950">{title}</h2>
-            {description && <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{description}</p>}
           </div>
           <button onClick={closeWithConfirm} className="grid h-10 w-10 place-items-center rounded-[8px] bg-slate-100 text-xl font-black text-slate-700" aria-label="关闭">×</button>
         </div>
@@ -188,7 +185,7 @@ export function MobileFormSheet({
 
 export function TaskCard({ task, action }) {
   return (
-    <div className="rounded-[8px] border border-slate-100 bg-white p-4">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-base font-black text-slate-950">{task.title || task.content}</p>
@@ -204,7 +201,7 @@ export function TaskCard({ task, action }) {
 
 export function MessageCard({ message, onRead }) {
   return (
-    <div className="rounded-[8px] border border-slate-100 bg-white p-4">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-base font-black text-slate-950">{message.title}</p>
@@ -229,9 +226,9 @@ const sourceLabels = {
   breeding: "繁育提醒"
 };
 
-export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onApprove, onReject, onCancel, canSubmit, canReview, canCancel }) {
+export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onCancel, canSubmit, canCancel }) {
   return (
-    <div className="rounded-[8px] border border-slate-100 bg-white p-4">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-base font-black text-slate-950">{order.title || order.content}</p>
@@ -245,7 +242,7 @@ export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onAppr
         <p>处理人：{order.handler || order.owner || "未分配"} · 截止：{order.deadline || order.plannedAt || "-"}</p>
         <p>关联：{order.relatedObject || order.relatedBusiness || "-"}</p>
         {order.operationRequirement && <p>要求：{order.operationRequirement}</p>}
-        {(order.requirePhoto || order.requireReview) && <p>要求：{order.requirePhoto ? "需照片" : ""}{order.requirePhoto && order.requireReview ? "，" : ""}{order.requireReview ? "需复核" : ""}</p>}
+        {order.requirePhoto && <p>要求：需照片</p>}
       </div>
       {order.result && (
         <div className="mt-3 rounded-[8px] bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
@@ -253,7 +250,6 @@ export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onAppr
           <p className="mt-1">{order.result}</p>
           {order.resultSubmittedAt && <p className="mt-1 text-emerald-700">完成时间：{order.resultSubmittedAt}</p>}
           {order.resultException && <p className="mt-1 text-amber-700">异常说明：{order.resultException}</p>}
-          {order.reviewOpinion && <p className="mt-1 text-red-700">复核意见：{order.reviewOpinion}</p>}
         </div>
       )}
       {canSubmit && (
@@ -262,16 +258,10 @@ export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onAppr
           <button onClick={onSubmitResult} className="min-h-11 rounded-[8px] bg-sky-50 text-sm font-black text-sky-700">提交结果</button>
         </div>
       )}
-      {canReview && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button onClick={onApprove} className="min-h-11 rounded-[8px] bg-emerald-700 text-sm font-black text-white">复核通过</button>
-          <button onClick={onReject} className="min-h-11 rounded-[8px] bg-red-50 text-sm font-black text-red-700">驳回</button>
-        </div>
-      )}
       {canCancel && <button onClick={onCancel} className="mt-2 min-h-11 w-full rounded-[8px] bg-slate-100 text-sm font-black text-slate-700">取消工单</button>}
       {onStatus && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {["处理中", "待复核", "已完成"].map((status) => (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {["处理中", "已完成"].map((status) => (
             <button key={status} onClick={() => onStatus(status)} className="min-h-11 rounded-[8px] bg-emerald-50 text-sm font-black text-emerald-700">
               {status}
             </button>
@@ -284,7 +274,7 @@ export function WorkOrderCard({ order, onStatus, onStart, onSubmitResult, onAppr
 
 export function OperationManualCard({ manual }) {
   return (
-    <div className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-md ring-1 ring-slate-200">
       <div className="flex items-start gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-emerald-50 text-emerald-700"><BookOpen size={20} /></span>
         <div className="min-w-0 flex-1">
@@ -305,7 +295,7 @@ export function OperationManualCard({ manual }) {
 
 export function EmployeeStatsCard({ stat }) {
   return (
-    <div className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <div className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-md ring-1 ring-slate-200">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-lg font-black">{stat.employee}</p>
@@ -324,12 +314,12 @@ export function EmployeeStatsCard({ stat }) {
 
 export function DraftBox({ drafts = [], onDelete }) {
   if (!drafts.length) {
-    return <div className="rounded-[8px] bg-slate-50 p-4 text-base font-bold text-slate-500">暂无草稿。表单里的“保存草稿”会模拟离线暂存。</div>;
+    return <div className="rounded-[8px] border border-dashed border-slate-300 bg-white p-4 text-base font-bold text-slate-500">暂无草稿</div>;
   }
   return (
     <div className="space-y-3">
       {drafts.map((draft) => (
-        <div key={draft.id} className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div key={draft.id} className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-md ring-1 ring-slate-200">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-slate-100 text-slate-600"><FileText size={20} /></span>
             <div className="min-w-0 flex-1">
@@ -345,8 +335,8 @@ export function DraftBox({ drafts = [], onDelete }) {
   );
 }
 
-export function EmptyState({ title = "暂无数据", desc = "完成提交后会显示在这里。" }) {
-  return <div className="rounded-[8px] bg-slate-50 p-5 text-center"><p className="text-lg font-black text-slate-700">{title}</p><p className="mt-1 text-sm font-bold text-slate-500">{desc}</p></div>;
+export function EmptyState({ title = "暂无数据", desc }) {
+  return <div className="rounded-[8px] border border-dashed border-slate-300 bg-white p-5 text-center"><p className="text-lg font-black text-slate-700">{title}</p></div>;
 }
 
 export function Field({ label, children }) {

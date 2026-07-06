@@ -12,10 +12,10 @@ import {
   MessagesPage,
   MilkPage,
   MobileHomePage,
-  ProfilePage,
   QualityPage,
   RecordsPage,
   TasksPage,
+  WorkbenchPage,
   WorkOrdersPage
 } from "./pages/mobile/MobilePages.jsx";
 
@@ -27,9 +27,10 @@ export default function App() {
           <Route path="/" element={<MobileHomePage />} />
           <Route path="/app" element={<MobileHomePage />} />
           <Route path="/mobile" element={<MobileHomePage />} />
-          <Route path="/mobile-workbench" element={<MobileHomePage />} />
+          <Route path="/mobile-workbench" element={<WorkbenchPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/work" element={<TasksPage />} />
+          <Route path="/workbench" element={<WorkbenchPage />} />
           <Route path="/feeding" element={<FeedingPage />} />
           <Route path="/feeding-records" element={<FeedingPage />} />
           <Route path="/feeding-plans" element={<FeedingPage />} />
@@ -57,7 +58,7 @@ export default function App() {
           <Route path="/manuals" element={<ManualsPage />} />
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile" element={<Navigate to="/app" replace />} />
 
           <Route path="/dashboard" element={<Navigate to="/app" replace />} />
           <Route path="/ai" element={<Navigate to="/app" replace />} />
@@ -73,8 +74,8 @@ export default function App() {
           <Route path="/beef-workbench" element={<Navigate to="/app" replace />} />
           <Route path="/feed-workbench" element={<Navigate to="/app" replace />} />
           <Route path="/dairy-plant-workbench" element={<Navigate to="/app" replace />} />
-          <Route path="/settings" element={<Navigate to="/profile" replace />} />
-          <Route path="/data-tools" element={<Navigate to="/profile" replace />} />
+          <Route path="/settings" element={<Navigate to="/app" replace />} />
+          <Route path="/data-tools" element={<Navigate to="/app" replace />} />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Route>
       </Routes>

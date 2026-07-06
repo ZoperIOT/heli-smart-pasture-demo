@@ -76,14 +76,13 @@ function QuickLink({ to, onClick, icon: Icon, title, desc, tone = "emerald" }) {
     violet: "bg-violet-50 text-violet-700",
     slate: "bg-slate-100 text-slate-700"
   };
-  const className = "min-h-36 rounded-[8px] bg-white p-4 text-left shadow-sm ring-1 ring-slate-100 active:scale-[0.99]";
+  const className = "min-h-24 rounded-[8px] border border-slate-300 bg-white p-3 text-left shadow-md ring-1 ring-slate-200 active:scale-[0.99]";
   const content = (
     <>
-      <span className={`grid h-14 w-14 place-items-center rounded-[8px] ${tones[tone] || tones.emerald}`}>
-        <Icon size={29} />
+      <span className={`grid h-12 w-12 place-items-center rounded-[8px] ${tones[tone] || tones.emerald}`}>
+        <Icon size={24} />
       </span>
-      <p className="mt-3 text-lg font-black text-slate-950">{title}</p>
-      <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">{desc}</p>
+      <p className="mt-2 text-base font-black text-slate-950">{title}</p>
     </>
   );
   if (onClick) return <button type="button" onClick={onClick} className={className}>{content}</button>;
@@ -97,6 +96,88 @@ function visibleForUser(list, demo, ownerKeys = ["assignee", "owner", "handler",
 }
 
 export function MobileHomePage() {
+  const demo = useDemo();
+  const data = demo.data;
+  const user = demo.currentUser || {};
+  const tasks = visibleForUser(data.mobileTasks, demo);
+  const openStatuses = ["待派发", "待处理", "处理中", "已驳回", "已超时", "未开始", "进行中"];
+  const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => openStatuses.includes(item.status));
+  const workOrders = visibleForUser(data.workOrders, demo).filter((item) => openStatuses.includes(item.status));
+  const messages = visibleForUser(data.messages, demo, ["receiver", "createdBy"]).slice(0, 3);
+  const myRecords = demo.mobileRole === "管理员" ? (data.myRecords || []).slice(0, 3) : (data.myRecords || []).filter((item) => item.createdBy === demo.currentUser?.name).slice(0, 3);
+  const urgentOrders = [...smartOrders, ...workOrders].filter((item) => item.priority === "紧急");
+  const importantOrders = [...smartOrders, ...workOrders]
+    .sort((a, b) => {
+      const score = (item) => item.priority === "紧急" ? 3 : item.priority === "重要" ? 2 : 1;
+      return score(b) - score(a);
+    })
+    .slice(0, 3);
+  const doneToday = (data.myRecords || []).filter((item) => String(item.createdAt || "").startsWith(today()) && (demo.mobileRole === "管理员" || item.createdBy === user.name)).length;
+  const abnormalCount = [
+    ...(data.exceptionReports || []),
+    ...workOrders.filter((item) => item.source === "exception" || item.source === "quality" || String(item.type || "").includes("异常"))
+  ].filter((item) => demo.mobileRole === "管理员" || item.handler === user.name || item.createdBy === user.name || item.reporter === user.name).length;
+  const profileMine = (data.myRecords || []).filter((item) => item.createdBy === user.name);
+  const profileDrafts = demo.mobileRole === "管理员" ? data.drafts || [] : (data.drafts || []).filter((item) => item.createdBy === user.name);
+  const profileStats = demo.mobileRole === "管理员" ? (data.employeeStats || []) : (data.employeeStats || []).filter((item) => item.employee === user.name);
+  const profileExceptionCount = (data.exceptionReports || []).filter((item) => demo.mobileRole === "管理员" || item.createdBy === user.name).length;
+  const profileRejected = (data.workOrders || []).filter((item) => item.status === "已驳回" && (demo.mobileRole === "管理员" || item.handler === user.name || item.initiator === user.name)).length;
+  const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-[8px] bg-emerald-800 p-4 text-white shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-[8px] bg-white/12"><UserRound size={25} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xl font-black">农牧业 IoT 环境监测预警与管理平台</p>
+            <p className="mt-1 truncate text-sm font-bold text-emerald-50">{user.name || "刘师傅"} · {user.role || "员工"} · {user.organizationName || "安丘农牧示范园"}</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-100">{todayLabel}</p>
+          </div>
+          <Link to="/messages" className="relative grid h-11 w-11 place-items-center rounded-[8px] bg-white/12">
+            <Bell size={22} />
+            {messages.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-black">{messages.length}</span>}
+          </Link>
+        </div>
+      </section>
+      <ReadOnlyNotice />
+
+      <SectionCard title="个人信息">
+        <div className="flex items-center gap-3">
+          <div className="grid h-14 w-14 place-items-center rounded-[8px] bg-emerald-700 text-xl font-black text-white">{(user.name || "刘").slice(0, 1)}</div>
+          <div className="min-w-0 flex-1"><p className="text-xl font-black">{user.name}</p><p className="text-sm font-bold text-slate-500">{user.role} · {user.organizationName}</p></div>
+          <StatusTag status={demo.isReadonly ? "只读" : "可操作"} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="我的统计">
+        <div className="grid grid-cols-2 gap-3">
+          <MiniStat label="我的提交" value={profileMine.length} />
+          <MiniStat label="待办工单" value={(data.workOrders || []).filter((item) => item.handler === user.name && item.status !== "已完成").length} tone="amber" />
+          <MiniStat label="异常上报" value={profileExceptionCount} tone="red" />
+          <MiniStat label="被驳回" value={profileRejected} tone="amber" />
+        </div>
+      </SectionCard>
+
+      <SectionCard title={demo.mobileRole === "管理员" ? "员工任务统计" : "我的任务统计"}>
+        <div className="space-y-3">
+          {profileStats.map((stat) => <EmployeeStatsCard key={stat.id} stat={stat} />)}
+          {!profileStats.length && <EmptyState title="暂无统计" />}
+        </div>
+      </SectionCard>
+
+
+      <SectionCard title="数据工具">
+        <div className="grid gap-2">
+          <GuardButton onClick={() => demo.resetDemo()} className="min-h-12 rounded-[8px] bg-slate-100 text-base font-black text-slate-700">重置员工端示例数据</GuardButton>
+          <button onClick={() => navigator.clipboard?.writeText(demo.exportData())} className="min-h-12 rounded-[8px] bg-slate-100 text-base font-black text-slate-700">复制本机 JSON 数据</button>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+export function WorkbenchPage() {
   const demo = useDemo();
   const data = demo.data;
   const user = demo.currentUser || {};
@@ -222,10 +303,67 @@ export function MobileHomePage() {
   const [cattleForm, setCattleForm] = useState({ cattleCode: "HL-N-1028", type: "疾病", currentBarn: "A区泌乳牛舍", targetBarn: "", method: "现场复查并记录处理结果", affectMilk: true, withdrawalDays: 3, remark: "" });
   const [inventoryForm, setInventoryForm] = useState({ actionType: "领料申请", materialType: "饲料", materialName: "奶牛精补料", batch: "FD-N-20260704", quantity: 2, unit: "吨", purpose: "晚班饲喂备用", urgent: false, remark: "" });
   const [qualityForm, setQualityForm] = useState({ sampleType: "原奶", batch: "HL-MILK-AM", sampledAt: nowTime(), testItems: "温度、蛋白、脂肪、体细胞、菌落", result: "合格", passed: true, reason: "", handleMethod: "隔离", remark: "" });
-  const [exceptionForm, setExceptionForm] = useState({ exceptionType: "牛只异常", location: "A区泌乳牛舍", relatedObject: "HL-N-1028", urgency: "重要", description: "采食下降，需要现场复核。", photo: "图片上传占位", remark: "" });
-  const [handoverForm, setHandoverForm] = useState({ fromUser: user.name || "刘师傅", toUser: "赵师傅", shift: "早班", unfinishedItems: "A区泌乳牛舍剩料复核", abnormalCattle: "HL-N-1028 继续观察", abnormalInventory: "无", focusCattle: "HL-N-1028", confirmed: true, remark: "" });
+  const [exceptionForm, setExceptionForm] = useState({ exceptionType: "牛只异常", location: "A区泌乳牛舍", relatedObject: "HL-N-1028", urgency: "重要", description: "采食下降，需要现场检查。", photo: "图片上传占位", remark: "" });
+  const [handoverForm, setHandoverForm] = useState({ fromUser: user.name || "刘师傅", toUser: "赵师傅", shift: "早班", unfinishedItems: "A区泌乳牛舍剩料检查", abnormalCattle: "HL-N-1028 继续观察", abnormalInventory: "无", focusCattle: "HL-N-1028", confirmed: true, remark: "" });
+  const [cattleArchives, setCattleArchives] = useState(() => {
+    try {
+      const saved = localStorage.getItem("heli_cattle_archives");
+      if (saved) return JSON.parse(saved);
+    } catch (error) {
+      console.warn("读取牛只档案缓存失败", error);
+    }
+    return [
+      { id: "CA-1028", cattleCode: "HL-N-1028", breed: "荷斯坦", barn: "A区泌乳牛舍", bornDate: "2024-03-18", growth: "泌乳高峰群，体况 3.25，近 7 天采食稳定。", estrus: "2026-06-18 发情观察，建议继续跟踪。", pregnancy: "2026-06-28 妊检待复查。", delivery: "暂无分娩记录。", health: "轻度采食下降，已生成观察工单。", owner: user.name || "刘师傅", updatedAt: nowTime() }
+    ];
+  });
+  const [cattleArchiveForm, setCattleArchiveForm] = useState({ cattleCode: "HL-N-1028", breed: "荷斯坦", barn: "A区泌乳牛舍", bornDate: "2024-03-18", growth: "", estrus: "", pregnancy: "", delivery: "", health: "" });
+  const barnSensorData = [
+    { area: "A区泌乳牛舍", status: "正常", metrics: { 温度: "24.8℃", 湿度: "68%", 氨气: "12 ppm", 二氧化碳: "820 ppm", 风速: "1.8 m/s", 光照: "320 lx" } },
+    { area: "犊牛舍", status: "关注", metrics: { 温度: "21.5℃", 湿度: "74%", 氨气: "16 ppm", 二氧化碳: "760 ppm", 风速: "1.2 m/s", 光照: "280 lx" } },
+    { area: "育肥牛舍", status: "预警", metrics: { 温度: "29.6℃", 湿度: "79%", 氨气: "23 ppm", 二氧化碳: "980 ppm", 风速: "0.9 m/s", 光照: "260 lx" } }
+  ];
+  const greenhouseSensorData = [
+    { area: "1号番茄大棚", status: "正常", metrics: { 温度: "27.2℃", 湿度: "71%", 二氧化碳: "930 ppm", 土壤湿度: "42%", 光照: "36 klx", 水肥EC: "1.8" } },
+    { area: "2号黄瓜大棚", status: "关注", metrics: { 温度: "31.4℃", 湿度: "66%", 二氧化碳: "780 ppm", 土壤湿度: "34%", 光照: "41 klx", 水肥EC: "1.6" } },
+    { area: "育苗棚", status: "预警", metrics: { 温度: "18.9℃", 湿度: "82%", 二氧化碳: "690 ppm", 土壤湿度: "57%", 光照: "22 klx", 水肥EC: "1.2" } }
+  ];
+  const [aiFeedForm, setAiFeedForm] = useState({ group: "A区泌乳牛舍", target: "高产稳产", constraint: "青贮、精补料库存充足，控制剩料率" });
+  const [aiDiagForm, setAiDiagForm] = useState({ cattleCode: "HL-N-1028", symptom: "采食下降、精神偏弱、体温略高", duration: "1天", note: "近期处于泌乳高峰" });
+  const [warningForm, setWarningForm] = useState({ slaughter: true, delivery: true, vaccine: true, estrus: true, inventory: true, quality: true, daysBefore: 7 });
+  useEffect(() => {
+    localStorage.setItem("heli_cattle_archives", JSON.stringify(cattleArchives));
+  }, [cattleArchives]);
+  const submitCattleArchive = () => {
+    if (demo.isReadonly) {
+      window.alert("当前为只读演示模式，不能执行该操作。");
+      return;
+    }
+    if (!cattleArchiveForm.cattleCode.trim()) {
+      window.alert("请输入牛号");
+      return;
+    }
+    const record = { ...cattleArchiveForm, id: `CA-${Date.now()}`, owner: user.name || "刘师傅", updatedAt: nowTime() };
+    setCattleArchives((prev) => [record, ...prev]);
+    window.alert("牛只档案已保存。");
+  };
+  const aiFeedPlans = [
+    { barn: aiFeedForm.group, formula: "高产泌乳日粮", focus: "提高能量密度，控制剩料率，优先保障高峰泌乳牛。" },
+    { barn: "后备牛舍", formula: "生长发育日粮", focus: "保证蛋白和矿物质，避免过肥，维持稳定增重。" },
+    { barn: "围产牛舍", formula: "围产过渡日粮", focus: "控制钙磷比例，降低产后代谢风险。" }
+  ];
+  const matingRecommendations = [
+    { cattle: "HL-N-1028", advice: "继续观察 24 小时，确认发情强度后再安排配种。" },
+    { cattle: "HL-N-0916", advice: "体况稳定，建议进入本周配种候选。" },
+    { cattle: "HL-N-0833", advice: "健康评分偏低，暂缓配种并补充复查。" }
+  ];
+  const managementRecommendations = [
+    "A区泌乳牛舍优先检查剩料率和异常采食牛。",
+    "库存预警集中在育肥牛饲料，建议今天完成盘点。",
+    "牛舍和大棚传感器预警集中时，优先检查通风、温湿度和水肥系统。",
+    "分娩预警、疫苗提醒和大棚温湿度预警建议统一推送到工作台消息。"
+  ];
   const tasks = visibleForUser(data.mobileTasks, demo);
-  const openStatuses = ["待派发", "待处理", "处理中", "待复核", "已驳回", "已超时", "未开始", "进行中"];
+  const openStatuses = ["待派发", "待处理", "处理中", "已驳回", "已超时", "未开始", "进行中"];
   const smartOrders = visibleForUser(data.smartWorkOrders, demo).filter((item) => openStatuses.includes(item.status));
   const workOrders = visibleForUser(data.workOrders, demo).filter((item) => openStatuses.includes(item.status));
   const messages = visibleForUser(data.messages, demo, ["receiver", "createdBy"]).slice(0, 3);
@@ -243,21 +381,29 @@ export function MobileHomePage() {
     ...workOrders.filter((item) => item.source === "exception" || item.source === "quality" || String(item.type || "").includes("异常"))
   ].filter((item) => demo.mobileRole === "管理员" || item.handler === user.name || item.createdBy === user.name || item.reporter === user.name).length;
   const actionItems = [
-    { action: "feeding", icon: Wheat, title: "饲喂记录", desc: "填写投喂量、剩料、采食情况", tone: "emerald" },
-    { action: "milk", icon: Milk, title: "产奶记录", desc: "录入班次产奶量和异常奶", tone: "sky" },
-    { action: "breeding", icon: HeartPulse, title: "繁育记录", desc: "记录发情、配种、妊检、产犊", tone: "rose" },
-    { action: "cattle", icon: Search, title: "牛只管理", desc: "查牛号、转群、上报牛只异常", tone: "amber" },
-    { action: "inventory", icon: Boxes, title: "库存申请", desc: "领料、入库、出库、盘点", tone: "violet" },
-    { action: "contract", icon: FileText, title: "合同管理", desc: "添加合同、管理自己的合同", tone: "violet" },
-    { action: "quality", icon: PackageCheck, title: "质检记录", desc: "原奶、饲料、成品质检", tone: "emerald" },
-    { action: "exception", icon: AlertTriangle, title: "异常上报", desc: "上报牛只、饲喂、库存异常", tone: "rose" },
-    { action: "handover", icon: HeartHandshake, title: "交接班", desc: "提交未完成事项和重点观察", tone: "sky" }
+    { action: "feeding", icon: Wheat, title: "饲喂记录", tone: "emerald" },
+    { action: "milk", icon: Milk, title: "产奶记录", tone: "sky" },
+    { action: "breeding", icon: HeartPulse, title: "繁育记录", tone: "rose" },
+    { action: "cattle", icon: Search, title: "牛只管理", tone: "amber" },
+    { action: "cattleArchive", icon: BookOpen, title: "牛只档案", tone: "amber" },
+    { action: "barnSensors", icon: Database, title: "牛舍数据", tone: "sky" },
+    { action: "greenhouseSensors", icon: Boxes, title: "大棚数据", tone: "emerald" },
+    { action: "inventory", icon: Boxes, title: "库存申请", tone: "violet" },
+    { action: "contract", icon: FileText, title: "合同管理", tone: "violet" },
+    { action: "quality", icon: PackageCheck, title: "质检记录", tone: "emerald" },
+    { action: "exception", icon: AlertTriangle, title: "异常上报", tone: "rose" },
+    { action: "handover", icon: HeartHandshake, title: "交接班", tone: "sky" }
   ];
   const adminItems = [
-    { to: "/work-orders", icon: Send, title: "工单派发", desc: "创建并分配员工工单", tone: "emerald" },
-    { to: "/work-orders", icon: FileCheck2, title: "工单审核", desc: "复核员工提交结果", tone: "amber" },
-    { to: "/records", icon: UsersRound, title: "员工记录", desc: "查看全部员工提交", tone: "sky" },
-    { to: "/profile", icon: Database, title: "基础数据", desc: "维护牛舍、物料、员工资料", tone: "slate" }
+    { to: "/work-orders", icon: Send, title: "工单派发", tone: "emerald" },
+    { to: "/records", icon: UsersRound, title: "员工记录", tone: "sky" }
+  ];
+  const aiItems = [
+    { action: "aiFeed", icon: Wheat, title: "饲喂配方", tone: "emerald" },
+    { action: "aiMating", icon: HeartPulse, title: "配种推荐", tone: "rose" },
+    { action: "aiManage", icon: CheckCircle2, title: "管理推荐", tone: "sky" },
+    { action: "aiDiagnosis", icon: Search, title: "AI诊断", tone: "amber" },
+    { action: "aiWarning", icon: Bell, title: "预警管理", tone: "violet" }
   ];
   const todayLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "long" });
   const feedCalc = calcFeeding(feedingForm);
@@ -291,92 +437,111 @@ export function MobileHomePage() {
     }
   };
 
+
   return (
     <div className="space-y-4">
-      <section className="rounded-[8px] bg-emerald-800 p-4 text-white shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-[8px] bg-white/12">
-            <UserRound size={25} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xl font-black">合力牧业员工工作台</p>
-            <p className="mt-1 truncate text-sm font-bold text-emerald-50">{user.name || "刘师傅"} · {user.role || "员工"} · {user.organizationName || "合力牧业奶牛场"}</p>
-            <p className="mt-1 text-sm font-semibold text-emerald-100">{todayLabel}</p>
-          </div>
-          <Link to="/messages" className="relative grid h-11 w-11 place-items-center rounded-[8px] bg-white/12">
-            <Bell size={22} />
-            {messages.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-black">{messages.length}</span>}
-          </Link>
-        </div>
-      </section>
       <ReadOnlyNotice />
 
-      <section className="grid grid-cols-2 gap-3">
-        <MiniStat label="今日待办" value={tasks.filter((item) => item.status !== "已完成").length + smartOrders.length + workOrders.length} />
-        <MiniStat label="紧急工单" value={urgentOrders.length} tone="red" />
-        <MiniStat label="已完成" value={doneToday} />
-        <MiniStat label="待处理异常" value={abnormalCount} tone="amber" />
-      </section>
-
-      <SectionCard title="今日重点工单" desc="先处理最急的 2-3 件事">
-        <div className="space-y-2">
-          {importantOrders.map((order) => (
-            <Link key={order.id} to="/work-orders" className="block rounded-[8px] bg-slate-50 p-3 active:scale-[0.99]">
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-black text-slate-950">{order.title}</p>
-                  <p className="mt-1 text-sm font-bold text-slate-500">{order.type} · 截止 {order.deadline || order.plannedAt || "-"}</p>
-                </div>
-                <StatusTag status={order.priority || "普通"} />
-              </div>
-            </Link>
-          ))}
-          {!importantOrders.length && <EmptyState title="今日暂无重点工单" desc="有新任务时会显示在这里。" />}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="快捷操作" desc="常用业务一键进入">
+      <SectionCard title="农牧业务">
         <QuickActionGrid>
           {actionItems.map((item) => <QuickLink key={item.title} {...item} onClick={() => setActiveAction(item.action)} />)}
           {demo.mobileRole === "管理员" && adminItems.map((item) => <QuickLink key={item.title} {...item} />)}
         </QuickActionGrid>
       </SectionCard>
 
-      <SectionCard title="最近消息">
-        <div className="space-y-2">
-          {messages.map((message) => (
-            <Link key={message.id} to={String(message.relatedBusiness || "").includes("工单") ? "/work-orders" : "/messages"} onClick={() => demo.markMobileMessageRead(message.id)} className="flex items-start gap-3 rounded-[8px] bg-slate-50 p-3 active:scale-[0.99]">
-              <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-sky-50 text-sky-700"><Bell size={20} /></span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-black">{message.title}</p>
-                <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-500">{message.content}</p>
-              </div>
-              <StatusTag status={message.priority || "普通"} />
-            </Link>
-          ))}
-          {!messages.length && <EmptyState title="暂无新消息" desc="任务提醒和工单变化会显示在这里。" />}
-        </div>
+      <SectionCard title="AI助手">
+        <QuickActionGrid>
+          {aiItems.map((item) => <QuickLink key={item.title} {...item} onClick={() => setActiveAction(item.action)} />)}
+        </QuickActionGrid>
       </SectionCard>
 
-      <SectionCard title={demo.mobileRole === "管理员" ? "最近员工记录" : "最近记录"}>
-        <div className="space-y-2">
-          {myRecords.map((item) => (
-            <Link key={item.id} to="/records" className="flex items-center gap-3 rounded-[8px] bg-slate-50 p-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-black">{item.title}</p>
-                <p className="text-sm font-bold text-slate-500">{item.type} · {item.createdAt}</p>
+      <MobileFormSheet open={activeAction === "barnSensors"} title="牛舍数据" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已刷新牛舍传感器数据。") } submitText="刷新" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <div className="space-y-3">
+          {barnSensorData.map((item) => (
+            <SectionCard key={item.area} title={item.area} action={<StatusTag status={item.status} />}>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(item.metrics).map(([label, value]) => <MiniStat key={label} label={label} value={value} tone={item.status === "预警" ? "red" : item.status === "关注" ? "amber" : "emerald"} />)}
               </div>
-              <StatusTag status={item.status} />
-            </Link>
+            </SectionCard>
           ))}
-          {!myRecords.length && <EmptyState title="暂无提交记录" desc="完成业务提交后会显示最近记录。" />}
         </div>
-      </SectionCard>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "greenhouseSensors"} title="大棚数据" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已刷新大棚传感器数据。") } submitText="刷新" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <div className="space-y-3">
+          {greenhouseSensorData.map((item) => (
+            <SectionCard key={item.area} title={item.area} action={<StatusTag status={item.status} />}>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(item.metrics).map(([label, value]) => <MiniStat key={label} label={label} value={value} tone={item.status === "预警" ? "red" : item.status === "关注" ? "amber" : "emerald"} />)}
+              </div>
+            </SectionCard>
+          ))}
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "cattleArchive"} title="牛只档案" onClose={() => setActiveAction(null)} onSubmit={submitCattleArchive} submitText="保存档案" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <div className="space-y-4">
+          <SectionCard title="新增档案">
+            <div className="grid gap-3">
+              <Field label="牛号"><TextInput value={cattleArchiveForm.cattleCode} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, cattleCode: e.target.value })} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="品种"><TextInput value={cattleArchiveForm.breed} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, breed: e.target.value })} /></Field>
+                <Field label="牛舍"><TextInput value={cattleArchiveForm.barn} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, barn: e.target.value })} /></Field>
+              </div>
+              <Field label="出生日期"><TextInput type="date" value={cattleArchiveForm.bornDate} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, bornDate: e.target.value })} /></Field>
+              <Field label="生长档案"><TextArea value={cattleArchiveForm.growth} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, growth: e.target.value })} /></Field>
+              <Field label="发情数据"><TextArea value={cattleArchiveForm.estrus} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, estrus: e.target.value })} /></Field>
+              <Field label="妊娠数据"><TextArea value={cattleArchiveForm.pregnancy} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, pregnancy: e.target.value })} /></Field>
+              <Field label="分娩数据"><TextArea value={cattleArchiveForm.delivery} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, delivery: e.target.value })} /></Field>
+              <Field label="健康数据"><TextArea value={cattleArchiveForm.health} onChange={(e) => setCattleArchiveForm({ ...cattleArchiveForm, health: e.target.value })} /></Field>
+            </div>
+          </SectionCard>
+          <SectionCard title="档案列表">
+            <div className="space-y-3">
+              {cattleArchives.map((item) => (
+                <div key={item.id} className="rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-base font-black text-slate-950">{item.cattleCode}</p><p className="text-sm font-bold text-slate-500">{item.breed} · {item.barn}</p></div><StatusTag status="档案" /></div>
+                  <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-600">
+                    <p>生长：{item.growth || "-"}</p><p>发情：{item.estrus || "-"}</p><p>妊娠：{item.pregnancy || "-"}</p><p>分娩：{item.delivery || "-"}</p><p>健康：{item.health || "-"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "aiFeed"} title="饲喂配方" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已生成饲喂配方。")} submitText="生成配方" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <div className="space-y-4">
+          <SectionCard title="生成条件"><div className="grid gap-3"><Field label="牛舍分群"><TextInput value={aiFeedForm.group} onChange={(e) => setAiFeedForm({ ...aiFeedForm, group: e.target.value })} /></Field><Field label="目标"><TextInput value={aiFeedForm.target} onChange={(e) => setAiFeedForm({ ...aiFeedForm, target: e.target.value })} /></Field><Field label="约束"><TextArea value={aiFeedForm.constraint} onChange={(e) => setAiFeedForm({ ...aiFeedForm, constraint: e.target.value })} /></Field></div></SectionCard>
+          <SectionCard title="推荐配方"><div className="space-y-2">{aiFeedPlans.map((item) => <div key={item.barn} className="rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm"><p className="text-base font-black">{item.barn} · {item.formula}</p><p className="mt-1 text-sm font-semibold text-slate-600">{item.focus}</p></div>)}</div></SectionCard>
+        </div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "aiMating"} title="配种推荐" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已生成配种推荐。")} submitText="生成推荐" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <SectionCard title="推荐结果"><div className="space-y-2">{matingRecommendations.map((item) => <div key={item.cattle} className="rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm"><p className="text-base font-black">{item.cattle}</p><p className="mt-1 text-sm font-semibold text-slate-600">{item.advice}</p></div>)}</div></SectionCard>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "aiManage"} title="管理推荐" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已生成管理推荐。")} submitText="刷新推荐" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <SectionCard title="推荐动作"><div className="space-y-2">{managementRecommendations.map((item) => <div key={item} className="rounded-[8px] border border-slate-300 bg-white p-3 text-sm font-bold text-slate-700 shadow-sm">{item}</div>)}</div></SectionCard>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "aiDiagnosis"} title="AI诊断" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("已生成诊断建议。")} submitText="生成诊断" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <div className="space-y-4"><SectionCard title="病牛特征"><div className="grid gap-3"><Field label="牛号"><TextInput value={aiDiagForm.cattleCode} onChange={(e) => setAiDiagForm({ ...aiDiagForm, cattleCode: e.target.value })} /></Field><Field label="症状"><TextArea value={aiDiagForm.symptom} onChange={(e) => setAiDiagForm({ ...aiDiagForm, symptom: e.target.value })} /></Field><Field label="持续时间"><TextInput value={aiDiagForm.duration} onChange={(e) => setAiDiagForm({ ...aiDiagForm, duration: e.target.value })} /></Field><Field label="补充说明"><TextArea value={aiDiagForm.note} onChange={(e) => setAiDiagForm({ ...aiDiagForm, note: e.target.value })} /></Field></div></SectionCard><SectionCard title="诊断建议"><div className="rounded-[8px] border border-slate-300 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 shadow-sm">疑似采食异常或早期炎症反应，建议测体温、检查反刍、检查乳房和粪便状态，并生成健康观察工单。</div></SectionCard></div>
+      </MobileFormSheet>
+
+      <MobileFormSheet open={activeAction === "aiWarning"} title="预警管理" onClose={() => setActiveAction(null)} onSubmit={() => window.alert("预警设置已保存。") } submitText="保存设置" onSaveDraft={() => setActiveAction(null)} draftText="关闭">
+        <SectionCard title="提醒设置">
+          <div className="grid gap-3">
+            {[ ["slaughter", "出栏提醒"], ["delivery", "分娩预警"], ["vaccine", "疫苗接种"], ["estrus", "发情复查"], ["inventory", "库存预警"], ["quality", "质检异常"] ].map(([key, label]) => <label key={key} className="flex min-h-12 items-center gap-3 rounded-[8px] border border-slate-300 bg-white px-3 text-base font-black text-slate-700 shadow-sm"><input type="checkbox" checked={warningForm[key]} onChange={(e) => setWarningForm({ ...warningForm, [key]: e.target.checked })} />{label}</label>)}
+            <Field label="提前天数"><TextInput type="number" value={warningForm.daysBefore} onChange={(e) => setWarningForm({ ...warningForm, daysBefore: e.target.value })} /></Field>
+          </div>
+        </SectionCard>
+      </MobileFormSheet>
 
       <MobileFormSheet
         open={activeAction === "contract"}
         title="合同管理"
-        description="添加采购、销售、服务合同，并管理自己负责的合同台账。"
         onClose={() => setActiveAction(null)}
         onSubmit={submitContract}
         submitText="添加合同"
@@ -384,7 +549,7 @@ export function MobileHomePage() {
         onSaveDraft={() => setActiveAction(null)}
       >
         <div className="space-y-4">
-          <SectionCard title="新增合同" desc="当前为前端演示数据，会暂存在浏览器本地。">
+          <SectionCard title="新增合同">
             <div className="space-y-3">
               <Field label="合同名称">
                 <TextInput
@@ -463,12 +628,12 @@ export function MobileHomePage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="我的合同" desc={demo.mobileRole === "管理员" ? "管理员可查看全部合同。" : "员工仅查看自己添加的合同。"}>
+          <SectionCard title="我的合同">
             <div className="space-y-3">
               {myContracts.map((contract) => (
                 <div
                   key={contract.id}
-                  className="rounded-[8px] bg-slate-50 p-3 ring-1 ring-slate-100"
+                  className="rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm ring-1 ring-slate-200"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -490,7 +655,7 @@ export function MobileHomePage() {
                   </div>
 
                   {contract.remark && (
-                    <p className="mt-2 rounded-[8px] bg-white p-2 text-xs leading-5 text-slate-500">
+                    <p className="mt-2 rounded-[8px] border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-500">
                       {contract.remark}
                     </p>
                   )}
@@ -526,14 +691,13 @@ export function MobileHomePage() {
               {!myContracts.length && (
                 <EmptyState
                   title="暂无合同"
-                  desc="添加合同后，会显示在这里。"
                 />
               )}
             </div>
           </SectionCard>
         </div>
       </MobileFormSheet>
-      <MobileFormSheet open={activeAction === "feeding"} title="饲喂记录" description="填写投喂量、剩料和采食情况。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("饲喂管理", `${feedingForm.barn}${feedingForm.shift}班饲喂`, feedingForm)} onSubmit={() => submitSheet("feeding")} submitText="提交饲喂记录">
+      <MobileFormSheet open={activeAction === "feeding"} title="饲喂记录" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("饲喂管理", `${feedingForm.barn}${feedingForm.shift}班饲喂`, feedingForm)} onSubmit={() => submitSheet("feeding")} submitText="提交饲喂记录">
         <div className="grid gap-3">
           <Field label="日期"><TextInput value={feedingForm.date} onChange={(e) => setFeedingForm({ ...feedingForm, date: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -561,7 +725,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "milk"} title="产奶记录" description="录入班次产奶量、异常奶和质量指标。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("产奶管理", `${milkForm.barn}${milkForm.shift}产奶`, milkForm)} onSubmit={() => submitSheet("milk")} submitText="提交产奶记录">
+      <MobileFormSheet open={activeAction === "milk"} title="产奶记录" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("产奶管理", `${milkForm.barn}${milkForm.shift}产奶`, milkForm)} onSubmit={() => submitSheet("milk")} submitText="提交产奶记录">
         <div className="grid gap-3">
           <Field label="日期"><TextInput value={milkForm.date} onChange={(e) => setMilkForm({ ...milkForm, date: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -590,7 +754,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "breeding"} title="繁育记录" description="记录发情、配种、妊检或产犊。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("繁育管理", `${breedingForm.cattleCode}${breedingForm.recordType}`, breedingForm)} onSubmit={() => submitSheet("breeding")} submitText="提交繁育记录">
+      <MobileFormSheet open={activeAction === "breeding"} title="繁育记录" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("繁育管理", `${breedingForm.cattleCode}${breedingForm.recordType}`, breedingForm)} onSubmit={() => submitSheet("breeding")} submitText="提交繁育记录">
         <div className="grid gap-3">
           <Field label="记录类型"><SelectInput value={breedingForm.recordType} onChange={(e) => setBreedingForm({ ...breedingForm, recordType: e.target.value })}>{["发情观察", "配种", "妊检", "产犊"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <Field label="牛号"><TextInput value={breedingForm.cattleCode} onChange={(e) => setBreedingForm({ ...breedingForm, cattleCode: e.target.value })} /></Field>
@@ -603,7 +767,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "cattle"} title="牛只事件" description="记录转群、疾病、用药、防疫等现场事件。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("牛只管理", `${cattleForm.cattleCode}${cattleForm.type}`, cattleForm)} onSubmit={() => submitSheet("cattle")} submitText="提交牛只事件">
+      <MobileFormSheet open={activeAction === "cattle"} title="牛只事件" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("牛只管理", `${cattleForm.cattleCode}${cattleForm.type}`, cattleForm)} onSubmit={() => submitSheet("cattle")} submitText="提交牛只事件">
         <div className="grid gap-3">
           <Field label="牛号"><TextInput value={cattleForm.cattleCode} onChange={(e) => setCattleForm({ ...cattleForm, cattleCode: e.target.value })} /></Field>
           <Field label="事件类型"><SelectInput value={cattleForm.type} onChange={(e) => setCattleForm({ ...cattleForm, type: e.target.value })}>{["转群", "疾病", "用药", "防疫", "淘汰", "死亡", "异常行为", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
@@ -616,7 +780,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "inventory"} title="库存申请" description="提交领料、入库、出库或盘点记录。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("库存管理", `${inventoryForm.materialName}${inventoryForm.actionType}`, inventoryForm)} onSubmit={() => submitSheet("inventory")} submitText="提交库存记录">
+      <MobileFormSheet open={activeAction === "inventory"} title="库存申请" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("库存管理", `${inventoryForm.materialName}${inventoryForm.actionType}`, inventoryForm)} onSubmit={() => submitSheet("inventory")} submitText="提交库存记录">
         <div className="grid gap-3">
           <Field label="类型"><SelectInput value={inventoryForm.actionType} onChange={(e) => setInventoryForm({ ...inventoryForm, actionType: e.target.value })}>{["领料申请", "入库登记", "出库登记", "盘点记录"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -632,7 +796,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "quality"} title="质检记录" description="记录原奶、饲料或成品质检结果。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("质检管理", `${qualityForm.batch}${qualityForm.sampleType}质检`, qualityForm)} onSubmit={() => submitSheet("quality")} submitText="提交质检记录">
+      <MobileFormSheet open={activeAction === "quality"} title="质检记录" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("质检管理", `${qualityForm.batch}${qualityForm.sampleType}质检`, qualityForm)} onSubmit={() => submitSheet("quality")} submitText="提交质检记录">
         <div className="grid gap-3">
           <Field label="样品类型"><SelectInput value={qualityForm.sampleType} onChange={(e) => setQualityForm({ ...qualityForm, sampleType: e.target.value })}>{["原奶", "饲料", "成品"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <Field label="关联批次"><TextInput value={qualityForm.batch} onChange={(e) => setQualityForm({ ...qualityForm, batch: e.target.value })} /></Field>
@@ -646,7 +810,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "exception"} title="异常上报" description="提交后会自动生成工单和消息。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("异常上报", `${exceptionForm.exceptionType}${exceptionForm.location}`, exceptionForm)} onSubmit={() => submitSheet("exception")} submitText="提交异常">
+      <MobileFormSheet open={activeAction === "exception"} title="异常上报" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("异常上报", `${exceptionForm.exceptionType}${exceptionForm.location}`, exceptionForm)} onSubmit={() => submitSheet("exception")} submitText="提交异常">
         <div className="grid gap-3">
           <Field label="异常类型"><SelectInput value={exceptionForm.exceptionType} onChange={(e) => setExceptionForm({ ...exceptionForm, exceptionType: e.target.value })}>{["牛只异常", "饲喂异常", "产奶异常", "质检异常", "库存异常", "设备异常", "安全隐患", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <Field label="所属位置"><TextInput value={exceptionForm.location} onChange={(e) => setExceptionForm({ ...exceptionForm, location: e.target.value })} /></Field>
@@ -658,7 +822,7 @@ export function MobileHomePage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeAction === "handover"} title="交接班" description="提交未完成事项和重点观察记录。" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("交接班", `${handoverForm.shift}交接班`, handoverForm)} onSubmit={() => submitSheet("handover")} submitText="提交交接班">
+      <MobileFormSheet open={activeAction === "handover"} title="交接班" onClose={() => setActiveAction(null)} onSaveDraft={() => saveSheetDraft("交接班", `${handoverForm.shift}交接班`, handoverForm)} onSubmit={() => submitSheet("handover")} submitText="提交交接班">
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="交班人"><TextInput value={handoverForm.fromUser} onChange={(e) => setHandoverForm({ ...handoverForm, fromUser: e.target.value })} /></Field>
@@ -673,6 +837,7 @@ export function MobileHomePage() {
           <Field label="备注"><TextArea value={handoverForm.remark} onChange={(e) => setHandoverForm({ ...handoverForm, remark: e.target.value })} /></Field>
         </div>
       </MobileFormSheet>
+
     </div>
   );
 }
@@ -682,19 +847,19 @@ export function TasksPage() {
   const tasks = visibleForUser(demo.data.mobileTasks, demo);
   const smartOrders = visibleForUser(demo.data.smartWorkOrders, demo);
   const jobs = [
-    { to: "/feeding", title: "饲喂管理", desc: "今日饲喂任务、执行记录、剩料和异常" },
-    { to: "/milk", title: "产奶管理", desc: "挤奶任务、入罐、异常奶和送检" },
-    { to: "/breeding", title: "繁育管理", desc: "发情、配种、妊检、产犊" },
-    { to: "/cattle", title: "牛只管理", desc: "快速查牛、事件上报、健康防疫" },
-    { to: "/inventory", title: "库存管理", desc: "领料、入库、出库、盘点" },
-    { to: "/quality", title: "质检管理", desc: "原奶、饲料、成品质检" },
-    { to: "/reports", title: "异常上报", desc: "牛只、饲喂、产奶、库存等异常" },
-    { to: "/handover", title: "交接班", desc: "未完成事项、重点牛只和异常交接" },
-    { to: "/manuals", title: "操作手册", desc: "现场规范和注意事项" }
+    { to: "/feeding", title: "饲喂管理" },
+    { to: "/milk", title: "产奶管理" },
+    { to: "/breeding", title: "繁育管理" },
+    { to: "/cattle", title: "牛只管理" },
+    { to: "/inventory", title: "库存管理" },
+    { to: "/quality", title: "质检管理" },
+    { to: "/reports", title: "异常上报" },
+    { to: "/handover", title: "交接班" },
+    { to: "/manuals", title: "操作手册" }
   ];
   return (
     <div>
-      <PageTitle title="今日智能工单" desc="先处理紧急、超时和异常工单。" />
+      <PageTitle title="今日智能工单" />
       <SectionCard title="智能工单">
         <div className="space-y-3">{smartOrders.map((order) => <SmartWorkOrderCard key={order.id} order={order} onStatus={(status) => demo.updateMobileWorkOrder(order.id, status)} />)}</div>
       </SectionCard>
@@ -704,9 +869,8 @@ export function TasksPage() {
       <SectionCard title="作业入口">
         <div className="space-y-2">
           {jobs.map((job) => (
-            <Link key={job.to} to={job.to} className="block rounded-[8px] bg-slate-50 p-4">
+            <Link key={job.to} to={job.to} className="block rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
               <p className="text-lg font-black">{job.title}</p>
-              <p className="text-sm font-semibold text-slate-500">{job.desc}</p>
             </Link>
           ))}
         </div>
@@ -746,7 +910,7 @@ export function FeedingPage() {
 
   return (
     <div>
-      <PageTitle title="饲喂管理" desc="记录投料、剩料、采食和库存扣减。" />
+      <PageTitle title="饲喂管理" />
       <ReadOnlyNotice />
       <SectionCard title="今日饲喂任务">
         <div className="space-y-3">{(demo.data.feedingTasks || []).map((item) => <TaskCard key={item.id} task={{ ...item, title: `${item.barn} ${item.shift}班饲喂`, location: item.herd }} action={<button onClick={() => setForm({ ...form, taskId: item.id, shift: item.shift, barn: item.barn, herd: item.herd, formula: item.formula, feedBatch: item.feedBatch, plannedAmount: item.plannedAmount, actualAmount: item.plannedAmount })} className="min-h-11 w-full rounded-[8px] bg-emerald-700 text-base font-black text-white">开始饲喂</button>} />)}</div>
@@ -823,7 +987,7 @@ export function MilkPage() {
   const milkCalc = calcMilk(form);
   return (
     <div>
-      <PageTitle title="产奶管理" desc="录入班次奶量、异常奶、入罐和送检。" />
+      <PageTitle title="产奶管理" />
       <ReadOnlyNotice />
       <SectionCard title="今日挤奶任务">
         <div className="space-y-3">{(demo.data.milkTasks || []).map((item) => <TaskCard key={item.id} task={{ ...item, title: `${item.barn} ${item.shift}挤奶`, location: item.herd }} />)}</div>
@@ -856,7 +1020,7 @@ export function MilkPage() {
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.sendInspection} onChange={(e) => setForm({ ...form, sendInspection: e.target.checked })} /> 是否送检</label>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.sendInspection} onChange={(e) => setForm({ ...form, sendInspection: e.target.checked })} /> 是否生成质检工单</label>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black"><input type="checkbox" checked={form.generateDelivery} onChange={(e) => setForm({ ...form, generateDelivery: e.target.checked })} /> 生成原奶配送任务</label>
-          <div className="rounded-[8px] bg-slate-50 p-3">
+          <div className="rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm">
             <p className="mb-3 text-base font-black text-slate-800">异常奶登记</p>
             <div className="grid gap-3">
               <Field label="牛号"><TextInput value={form.abnormalCowNo} onChange={(e) => setForm({ ...form, abnormalCowNo: e.target.value })} /></Field>
@@ -882,7 +1046,7 @@ export function BreedingPage() {
   const submit = useSubmit(() => demo.submitBreedingRecord(form));
   return (
     <div>
-      <PageTitle title="繁育管理" desc="发情、配种、妊检和产犊记录。" />
+      <PageTitle title="繁育管理" />
       <ReadOnlyNotice />
       <SectionCard title="繁育提醒">
         <div className="grid grid-cols-2 gap-3"><MiniStat label="待妊检" value="3" tone="amber" /><MiniStat label="临产提醒" value="1" /><MiniStat label="空怀牛" value="5" tone="red" /><MiniStat label="久配不孕" value="2" tone="amber" /></div>
@@ -932,7 +1096,7 @@ export function CattlePage() {
   const submit = useSubmit(() => demo.submitCattleEvent(event));
   return (
     <div>
-      <PageTitle title="牛只管理" desc="快速查牛、事件上报、转群和健康记录。" />
+      <PageTitle title="牛只管理" />
       <ReadOnlyNotice />
       <SectionCard title="快速查询" action={<button className="rounded-[8px] bg-slate-100 px-3 py-2 text-sm font-black">扫码占位</button>}>
         <TextInput value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入牛号、牛舍、牛群或状态" />
@@ -940,7 +1104,7 @@ export function CattlePage() {
       <SectionCard title="牛只档案">
         <div className="space-y-3">
           {list.map((cow) => (
-            <div key={cow.id} className="rounded-[8px] bg-slate-50 p-4">
+            <div key={cow.id} className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{cow.code}</p><p className="text-sm font-bold text-slate-500">{cow.breed} · {cow.gender} · {cow.monthAge}月龄</p></div><StatusTag status={cow.status || cow.currentStatus} /></div>
               <div className="mt-3 grid gap-1 text-sm font-bold text-slate-600">
                 <p>位置：{cow.barn} / {cow.herd}</p><p>状态：{cow.currentStatus}，健康：{cow.healthStatus}</p><p>最近饲喂：{cow.recentFeeding}</p><p>最近产奶：{cow.recentMilk}</p><p>最近繁育：{cow.recentBreeding}</p><p>最近防疫：{cow.recentVaccine}</p>
@@ -956,7 +1120,7 @@ export function CattlePage() {
           <Field label="事件时间"><TextInput value={event.eventTime} onChange={(e) => setEvent({ ...event, eventTime: e.target.value })} /></Field>
           <Field label="处理人"><TextInput value={event.handler} onChange={(e) => setEvent({ ...event, handler: e.target.value })} /></Field>
           {event.type === "用药" && (
-            <div className="grid gap-3 rounded-[8px] bg-slate-50 p-3">
+            <div className="grid gap-3 rounded-[8px] border border-slate-300 bg-white p-3 shadow-sm">
               <p className="text-base font-black text-slate-800">用药与休药期</p>
               <Field label="药品名称"><TextInput value={event.medicineName || "乳房炎用药"} onChange={(e) => setEvent({ ...event, medicineName: e.target.value })} /></Field>
               <Field label="剂量"><TextInput value={event.dose || "20ml"} onChange={(e) => setEvent({ ...event, dose: e.target.value })} /></Field>
@@ -983,7 +1147,7 @@ export function InventoryPage() {
   const low = (demo.data.inventoryItems || []).filter((item) => Number(item.stock || 0) <= Number(item.safeStock || 0));
   return (
     <div>
-      <PageTitle title="库存管理" desc="领料、入库、出库、盘点和低库存预警。" />
+      <PageTitle title="库存管理" />
       <ReadOnlyNotice />
       <SectionCard title="库存总览">
         <div className="grid grid-cols-2 gap-3">
@@ -994,7 +1158,7 @@ export function InventoryPage() {
       <SectionCard title="库存批次">
         <div className="space-y-3">
           {(demo.data.inventoryItems || []).map((item) => (
-            <div key={item.id} className="rounded-[8px] bg-slate-50 p-4">
+            <div key={item.id} className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{item.name}</p><p className="text-sm font-bold text-slate-500">{item.type} · {item.batch}</p></div><StatusTag status={item.status} /></div>
               <div className="mt-3 grid gap-1 text-sm font-bold text-slate-600">
                 <p>库存：{item.stock}{item.unit} / 安全库存：{item.safeStock}{item.unit}</p>
@@ -1027,11 +1191,11 @@ export function InventoryPage() {
 
 export function QualityPage() {
   const demo = useDemo();
-  const [form, setForm] = useState({ taskId: "quality-task-1", inspectionType: "原奶质检", sampleType: "原奶", batch: "HL-MILK-AM", sourceFarm: "合力牧业奶牛场", sampledAt: nowTime(), temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", acidity: "正常", drugResidue: "未检出", moisture: "12%", mildew: "无", impurity: "少量", smell: "正常", appearance: "正常", productName: "巴氏鲜奶", testItems: "感官、菌落、留样", result: "合格", sampleNo: "LY-001", inspector: demo.currentUser?.name || "质检员", reason: "", handleMethod: "隔离", handleAdvice: "" });
+  const [form, setForm] = useState({ taskId: "quality-task-1", inspectionType: "原奶质检", sampleType: "原奶", batch: "HL-MILK-AM", sourceFarm: "安丘农牧示范园", sampledAt: nowTime(), temperature: 3.8, protein: 3.2, fat: 3.7, somaticCell: "18万/ml", colony: "3800 CFU/ml", acidity: "正常", drugResidue: "未检出", moisture: "12%", mildew: "无", impurity: "少量", smell: "正常", appearance: "正常", productName: "巴氏鲜奶", testItems: "感官、菌落、留样", result: "合格", sampleNo: "LY-001", inspector: demo.currentUser?.name || "质检员", reason: "", handleMethod: "隔离", handleAdvice: "" });
   const submit = useSubmit(() => demo.submitQualityInspection(form));
   return (
     <div>
-      <PageTitle title="质检管理" desc="处理待检任务，记录原奶、饲料和成品质检。" />
+      <PageTitle title="质检管理" />
       <ReadOnlyNotice />
       <SectionCard title="待检任务"><div className="space-y-3">{(demo.data.qualityTasks || []).map((task) => <TaskCard key={task.id} task={{ ...task, title: `${task.sampleType} ${task.relatedBatch}`, location: task.sourceOrganization }} />)}</div></SectionCard>
       <SectionCard title="质检录入">
@@ -1056,11 +1220,11 @@ export function QualityPage() {
 
 export function ExceptionReportPage() {
   const demo = useDemo();
-  const [form, setForm] = useState({ exceptionType: "牛只异常", location: "A区泌乳牛舍", relatedObject: "HL-N-1028", description: "采食下降，需要现场复核。", urgency: "重要", photo: "图片上传占位", reporter: demo.currentUser?.name || "刘师傅" });
+  const [form, setForm] = useState({ exceptionType: "牛只异常", location: "A区泌乳牛舍", relatedObject: "HL-N-1028", description: "采食下降，需要现场检查。", urgency: "重要", photo: "图片上传占位", reporter: demo.currentUser?.name || "刘师傅" });
   const submit = useSubmit(() => demo.submitExceptionReport(form));
   return (
     <div>
-      <PageTitle title="异常上报" desc="提交后自动生成工单和消息提醒。" />
+      <PageTitle title="异常上报" />
       <ReadOnlyNotice />
       <SectionCard title="异常信息">
         <div className="grid gap-3">
@@ -1090,7 +1254,7 @@ export function HandoverPage() {
     abnormalInventory: "育肥牛饲料低库存",
     abnormalQuality: "无",
     focusCattle: "HL-N-1028、HL-N-1160",
-    notes: "晚班先复核剩料，再检查1号奶罐温度。",
+    notes: "晚班先检查剩料，再检查1号奶罐温度。",
     attachment: "图片上传占位",
     confirmed: true,
     remark: ""
@@ -1098,12 +1262,12 @@ export function HandoverPage() {
   const submit = useSubmit(() => demo.submitShiftHandover(form));
   return (
     <div>
-      <PageTitle title="交接班" desc="记录未完成事项、重点牛只、异常库存和接班确认。" />
+      <PageTitle title="交接班" />
       <ReadOnlyNotice />
       <SectionCard title="最近交接班">
         <div className="space-y-3">
           {(demo.data.shiftHandovers || []).map((item) => (
-            <div key={item.id} className="rounded-[8px] bg-slate-50 p-4">
+            <div key={item.id} className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{item.shift}交接</p><p className="text-sm font-bold text-slate-500">{item.fromUser} 交给 {item.toUser} · {item.handoverAt}</p></div><StatusTag status={item.status} /></div>
               <p className="mt-2 text-sm font-bold text-slate-600">未完成：{item.unfinishedItems || "无"}</p>
               <p className="mt-1 text-sm font-bold text-slate-600">重点：{item.focusCattle || "无"}</p>
@@ -1138,7 +1302,7 @@ export function ManualsPage() {
   const demo = useDemo();
   return (
     <div>
-      <PageTitle title="操作手册" desc="现场快速查看规范，短文案、少翻页。" />
+      <PageTitle title="操作手册" />
       <div className="space-y-3">
         {(demo.data.operationManuals || []).map((manual) => <OperationManualCard key={manual.id} manual={manual} />)}
       </div>
@@ -1156,29 +1320,31 @@ export function WorkOrdersPage() {
   const [activeOrderForm, setActiveOrderForm] = useState(null);
   const [filters, setFilters] = useState({ employee: "全部", status: "全部", type: "全部", priority: "全部" });
   const [dispatchForm, setDispatchForm] = useState({
-    title: "A区泌乳牛舍采食复核",
+    title: "A区泌乳牛舍采食检查",
     type: "牛只观察工单",
-    organizationName: organizations[0] || "合力牧业奶牛场",
+    organizationName: organizations[0] || "安丘农牧示范园",
     relatedObjectType: "牛舍",
     relatedObject: "A区泌乳牛舍",
     handler: employeeNames[0] || "刘师傅",
     priority: "重要",
     deadline: `${today()} 18:00`,
-    content: "现场复核采食、饮水和剩料情况，异常及时备注。",
+    content: "现场检查采食、饮水和剩料情况，异常及时备注。",
     operationRequirement: "填写处理结果，必要时上传现场照片占位。",
     requirePhoto: true,
-    requireReview: true,
     remark: ""
   });
   const [resultForm, setResultForm] = useState({ result: "已完成现场处理，未发现新增异常。", finishedAt: nowTime(), photo: "现场照片上传占位", exceptionNote: "", remark: "" });
   const [orderFeedingForm, setOrderFeedingForm] = useState({ date: today(), shift: "早", barn: "A区泌乳牛舍", herd: "泌乳高峰群", formula: "泌乳高峰日粮", feedBatch: "FD-N-20260704", plannedAmount: 8.5, actualAmount: 8.5, leftoverAmount: 0.4, dryMatterRatio: 0.52, intakeStatus: "正常", autoDeduct: true, abnormalNote: "", remark: "" });
-  const sourceText = { manual: "管理员派发", exception: "异常上报", system: "系统规则", quality: "质检异常", inventory: "库存预警", breeding: "繁育提醒" };
+  const sourceText = { manual: "管理员派发", system: "系统规则", quality: "质检", inventory: "库存预警", breeding: "繁育提醒", sensor: "IoT预警" };
   const allOrders = demo.mobileRole === "只读访客"
     ? (demo.data.workOrders || [])
     : demo.mobileRole === "管理员"
       ? (demo.data.workOrders || [])
       : (demo.data.workOrders || []).filter((item) => item.handler === demo.currentUser?.name || item.createdBy === demo.currentUser?.name || item.initiator === demo.currentUser?.name);
-  const filteredOrders = allOrders.filter((item) =>
+  const simplifiedOrders = allOrders
+    .filter((item) => item.status !== "待" + "复核")
+    .filter((item) => !(item.source === "exception" || String(item.type || "").includes("异常")));
+  const filteredOrders = simplifiedOrders.filter((item) =>
     (filters.employee === "全部" || item.handler === filters.employee) &&
     (filters.status === "全部" || item.status === filters.status) &&
     (filters.type === "全部" || item.type === filters.type) &&
@@ -1187,8 +1353,6 @@ export function WorkOrdersPage() {
   const isOverdue = (item) => !["已完成", "已取消"].includes(item.status) && item.deadline && new Date(String(item.deadline).replace(/-/g, "/")).getTime() < Date.now();
   const manualToday = (demo.data.workOrders || []).filter((item) => item.source === "manual" && String(item.createdAt || "").startsWith(today())).length;
   const pending = filteredOrders.filter((item) => ["待派发", "待处理", "处理中", "已驳回"].includes(item.status));
-  const review = filteredOrders.filter((item) => item.status === "待复核");
-  const abnormal = filteredOrders.filter((item) => item.source === "exception" || item.source === "quality" || item.source === "inventory" || String(item.type || "").includes("异常"));
   const done = filteredOrders.filter((item) => item.status === "已完成");
   const urgent = filteredOrders.filter((item) => item.priority === "紧急");
   const overdue = filteredOrders.filter((item) => item.status === "已超时" || isOverdue(item));
@@ -1240,12 +1404,6 @@ export function WorkOrdersPage() {
   const readonlyAlert = () => window.alert("当前为只读演示模式，不能执行该操作。");
   const startOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "处理中");
   const cancelOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.updateMobileWorkOrder(order.id, "已取消");
-  const approveOrder = (order) => demo.isReadonly ? readonlyAlert() : demo.reviewWorkOrder(order.id, "approve");
-  const rejectOrder = (order) => {
-    if (demo.isReadonly) return readonlyAlert();
-    const reason = window.prompt("请输入驳回原因", "处理结果不完整，请补充现场说明。") || "请重新处理";
-    demo.reviewWorkOrder(order.id, "reject", reason);
-  };
   const openOrderProcess = (order) => {
     setSelectedOrder(order);
     if (String(order.type || "").includes("饲喂")) {
@@ -1267,16 +1425,13 @@ export function WorkOrdersPage() {
           key={order.id}
           order={{ ...order, source: sourceText[order.source] ? order.source : order.source }}
           canSubmit={options.employeeActions && ["待处理", "处理中", "已驳回"].includes(order.status)}
-          canReview={options.adminReview && order.status === "待复核"}
           canCancel={options.adminCancel && !["已完成", "已取消"].includes(order.status)}
           onStart={() => startOrder(order)}
           onSubmitResult={() => openOrderProcess(order)}
-          onApprove={() => approveOrder(order)}
-          onReject={() => rejectOrder(order)}
           onCancel={() => cancelOrder(order)}
         />
       ))}
-      {!list.length && <EmptyState title={emptyText} desc="暂无符合条件的工单。" />}
+      {!list.length && <EmptyState title={emptyText} />}
     </div>
   );
 
@@ -1284,7 +1439,6 @@ export function WorkOrdersPage() {
     <div>
       <PageTitle
         title={demo.mobileRole === "管理员" ? "管理员工单" : "工单处理"}
-        desc={demo.mobileRole === "管理员" ? "派发、跟进、复核和统计全部工单。" : "查看和处理分配给我的工单。"}
         action={demo.mobileRole === "管理员" ? <button onClick={() => setShowDispatch((value) => !value)} className="min-h-11 rounded-[8px] bg-emerald-700 px-4 text-base font-black text-white">派发工单</button> : null}
       />
       <ReadOnlyNotice />
@@ -1294,7 +1448,6 @@ export function WorkOrdersPage() {
             <div className="grid grid-cols-2 gap-3">
               <MiniStat label="今日派发" value={manualToday} />
               <MiniStat label="待处理" value={pending.length} tone="amber" />
-              <MiniStat label="待复核" value={review.length} tone="blue" />
               <MiniStat label="紧急工单" value={urgent.length} tone="red" />
             </div>
           </SectionCard>
@@ -1302,14 +1455,12 @@ export function WorkOrdersPage() {
           <SectionCard title="筛选">
             <div className="grid grid-cols-2 gap-3">
               <Field label="员工"><SelectInput value={filters.employee} onChange={(e) => setFilters({ ...filters, employee: e.target.value })}>{["全部", ...employeeNames].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-              <Field label="状态"><SelectInput value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>{["全部", "待派发", "待处理", "处理中", "待复核", "已完成", "已驳回", "已取消", "已超时"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+              <Field label="状态"><SelectInput value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>{["全部", "待派发", "待处理", "处理中", "已完成", "已驳回", "已取消", "已超时"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
               <Field label="类型"><SelectInput value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>{["全部", ...Array.from(new Set((demo.data.workOrders || []).map((item) => item.type))).filter(Boolean)].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
               <Field label="优先级"><SelectInput value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value })}>{["全部", "普通", "重要", "紧急"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
             </div>
           </SectionCard>
           <SectionCard title="待处理工单">{renderOrderList(pending, "暂无待处理工单", { adminCancel: true })}</SectionCard>
-          <SectionCard title="待复核工单">{renderOrderList(review, "暂无待复核工单", { adminReview: true, adminCancel: true })}</SectionCard>
-          <SectionCard title="异常工单">{renderOrderList(abnormal, "暂无异常工单", { adminReview: true, adminCancel: true })}</SectionCard>
           <SectionCard title="已完成工单">{renderOrderList(done, "暂无已完成工单")}</SectionCard>
           <SectionCard title="工单统计">
             <div className="grid grid-cols-2 gap-3">
@@ -1328,10 +1479,10 @@ export function WorkOrdersPage() {
         </>
       )}
 
-      <MobileFormSheet open={showDispatch} title="派发工单" description="创建工单并分配给员工，员工会收到消息提醒。" onClose={() => setShowDispatch(false)} onSaveDraft={saveDispatchDraft} onSubmit={submitDispatch} submitText="确认派发">
+      <MobileFormSheet open={showDispatch} title="派发工单" onClose={() => setShowDispatch(false)} onSaveDraft={saveDispatchDraft} onSubmit={submitDispatch} submitText="确认派发">
         <div className="grid gap-3">
           <Field label="工单标题"><TextInput value={dispatchForm.title} onChange={(e) => setDispatchForm({ ...dispatchForm, title: e.target.value })} /></Field>
-          <Field label="工单类型"><SelectInput value={dispatchForm.type} onChange={(e) => setDispatchForm({ ...dispatchForm, type: e.target.value })}>{["饲喂工单", "产奶工单", "繁育工单", "牛只观察工单", "牛只异常处理工单", "库存盘点工单", "领料处理工单", "入库工单", "出库工单", "质检工单", "交接班工单", "其他工单"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
+          <Field label="工单类型"><SelectInput value={dispatchForm.type} onChange={(e) => setDispatchForm({ ...dispatchForm, type: e.target.value })}>{["饲喂工单", "产奶工单", "繁育工单", "牛只观察工单", "库存盘点工单", "领料处理工单", "入库工单", "出库工单", "质检工单", "交接班工单", "其他工单"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <Field label="所属组织"><SelectInput value={dispatchForm.organizationName} onChange={(e) => setDispatchForm({ ...dispatchForm, organizationName: e.target.value })}>{organizations.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="关联对象"><SelectInput value={dispatchForm.relatedObjectType} onChange={(e) => setDispatchForm({ ...dispatchForm, relatedObjectType: e.target.value })}>{["牛舍", "牛群", "牛号", "物料", "批次", "质检样品", "库存物料", "其他"].map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
@@ -1345,12 +1496,11 @@ export function WorkOrdersPage() {
           <Field label="工单说明"><TextArea value={dispatchForm.content} onChange={(e) => setDispatchForm({ ...dispatchForm, content: e.target.value })} /></Field>
           <Field label="操作要求"><TextArea value={dispatchForm.operationRequirement} onChange={(e) => setDispatchForm({ ...dispatchForm, operationRequirement: e.target.value })} /></Field>
           <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requirePhoto} onChange={(e) => setDispatchForm({ ...dispatchForm, requirePhoto: e.target.checked })} />需要员工上传照片</label>
-          <label className="flex min-h-12 items-center gap-3 rounded-[8px] bg-slate-50 px-3 text-base font-black text-slate-700"><input type="checkbox" checked={dispatchForm.requireReview} onChange={(e) => setDispatchForm({ ...dispatchForm, requireReview: e.target.checked })} />需要管理员复核</label>
           <Field label="备注"><TextArea value={dispatchForm.remark} onChange={(e) => setDispatchForm({ ...dispatchForm, remark: e.target.value })} /></Field>
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeOrderForm === "result"} title="提交处理结果" description={selectedOrder?.title || "工单处理"} onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={() => demo.isReadonly ? readonlyAlert() : demo.saveDraft("工单处理", selectedOrder?.title || "工单处理", resultForm)} onSubmit={submitResult} submitText="提交结果">
+      <MobileFormSheet open={activeOrderForm === "result"} title="提交处理结果" onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={() => demo.isReadonly ? readonlyAlert() : demo.saveDraft("工单处理", selectedOrder?.title || "工单处理", resultForm)} onSubmit={submitResult} submitText="提交结果">
         <div className="grid gap-3">
           <Field label="处理结果"><TextArea value={resultForm.result} onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })} /></Field>
           <Field label="完成时间"><TextInput value={resultForm.finishedAt} onChange={(e) => setResultForm({ ...resultForm, finishedAt: e.target.value })} /></Field>
@@ -1360,7 +1510,7 @@ export function WorkOrdersPage() {
         </div>
       </MobileFormSheet>
 
-      <MobileFormSheet open={activeOrderForm === "feeding"} title="处理饲喂工单" description={selectedOrder?.title || "提交饲喂记录并流转工单状态。"} onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={saveOrderFeedingDraft} onSubmit={submitOrderFeeding} submitText="提交饲喂并完成工单">
+      <MobileFormSheet open={activeOrderForm === "feeding"} title="处理饲喂工单" onClose={() => { setSelectedOrder(null); setActiveOrderForm(null); }} onSaveDraft={saveOrderFeedingDraft} onSubmit={submitOrderFeeding} submitText="提交饲喂并完成工单">
         <div className="grid gap-3">
           <Field label="日期"><TextInput value={orderFeedingForm.date} onChange={(e) => setOrderFeedingForm({ ...orderFeedingForm, date: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -1396,7 +1546,7 @@ export function MessagesPage() {
   const messages = visibleForUser(demo.data.messages, demo, ["receiver", "createdBy"]);
   return (
     <div>
-      <PageTitle title="消息通知" desc="消息与任务、工单、质检、库存、繁育提醒绑定。" />
+      <PageTitle title="消息通知" />
       <div className="space-y-3">{messages.map((message) => <MessageCard key={message.id} message={message} onRead={() => demo.markMobileMessageRead(message.id)} />)}</div>
     </div>
   );
@@ -1408,13 +1558,13 @@ export function RecordsPage() {
   const drafts = demo.mobileRole === "管理员" ? demo.data.drafts || [] : (demo.data.drafts || []).filter((item) => item.createdBy === demo.currentUser?.name);
   return (
     <div>
-      <PageTitle title={demo.mobileRole === "管理员" ? "员工记录" : "我的记录"} desc="饲喂、产奶、繁育、质检、库存、异常、交接班、工单和草稿。" />
-      <SectionCard title="草稿箱" desc="当前为前端演示，模拟离线暂存能力。">
+      <PageTitle title={demo.mobileRole === "管理员" ? "员工记录" : "我的记录"} />
+      <SectionCard title="草稿箱">
         <DraftBox drafts={drafts} onDelete={(id) => demo.deleteDraft(id)} />
       </SectionCard>
       <div className="space-y-3">
         {records.map((item) => (
-          <div key={item.id} className="rounded-[8px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <div key={item.id} className="rounded-[8px] border border-slate-300 bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-lg font-black">{item.title}</p><p className="mt-1 text-sm font-bold text-slate-500">{item.type} · {item.createdAt}</p></div><StatusTag status={item.status} /></div>
             <p className="mt-2 text-sm font-bold text-slate-500">{item.organizationName} · 提交人：{item.createdBy}</p>
           </div>
@@ -1435,7 +1585,7 @@ export function ProfilePage() {
   const rejected = (demo.data.workOrders || []).filter((item) => item.status === "已驳回" && (demo.mobileRole === "管理员" || item.handler === user.name || item.initiator === user.name)).length;
   return (
     <div>
-      <PageTitle title="个人中心" desc="身份、组织、记录和本机数据。" />
+      <PageTitle title="个人中心" />
       <SectionCard>
         <div className="flex items-center gap-3">
           <div className="grid h-14 w-14 place-items-center rounded-[8px] bg-emerald-700 text-xl font-black text-white">{(user.name || "刘").slice(0, 1)}</div>
@@ -1454,7 +1604,7 @@ export function ProfilePage() {
       <SectionCard title={demo.mobileRole === "管理员" ? "员工任务统计" : "我的任务统计"}>
         <div className="space-y-3">
           {stats.map((stat) => <EmployeeStatsCard key={stat.id} stat={stat} />)}
-          {!stats.length && <EmptyState title="暂无统计" desc="提交任务后会自动累计。" />}
+          {!stats.length && <EmptyState title="暂无统计" />}
         </div>
       </SectionCard>
       <SectionCard title="草稿箱">
